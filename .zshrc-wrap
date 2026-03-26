@@ -33,6 +33,12 @@ alias agent-knowledge='bash "$YD_WORKSPACE/scripts/agent-knowledge.sh"'
 alias agent-optimize='bash "$YD_WORKSPACE/scripts/agent-optimize.sh"'
 alias agent-tasks='bash "$YD_WORKSPACE/scripts/agent-tasks.sh"'
 
+# Visualization tools (v3.4.0)
+alias visualize-tasks='bash "$YD_WORKSPACE/scripts/visualize-tasks.sh"'
+alias analyze-decisions='bash "$YD_WORKSPACE/scripts/analyze-decisions.sh"'
+alias memory-report='bash "$YD_WORKSPACE/scripts/memory-report.sh"'
+alias timeline='bash "$YD_WORKSPACE/scripts/timeline.sh"'
+
 # Memory shortcuts
 alias mem='cat "$YD_MEMORY/MEMORY.md" | head -50'
 alias mem-full='cat "$YD_MEMORY/MEMORY.md"'
@@ -65,7 +71,7 @@ function yd-end-session() {
     echo "   2. Push: cd $YD_WORKSPACE && git push"
 }
 
-echo "✅ YD 2026 wrap aliases loaded (v3.4.0 agent-native)"
+echo "✅ YD 2026 wrap aliases loaded (v3.4.0 agent-native + visualization)"
 echo ""
 echo "Session management:"
 echo "   wrap, sync-kb, mem, kb, yd-start-session, yd-end-session"
@@ -73,3 +79,6 @@ echo ""
 echo "Agent tools:"
 echo "   agent-context, agent-share, agent-decision, agent-checkpoint"
 echo "   agent-knowledge, agent-optimize, agent-tasks"
+echo ""
+echo "Visualization tools (NEW):"
+echo "   visualize-tasks, analyze-decisions, memory-report, timeline"
