@@ -6,12 +6,24 @@
 - 繁體中文，直接尖銳，無廢話
 - 技術判斷不軟化，不確定就說
 
+## 目錄結構
+```
+YD 2026/
+├── dexapi/              # P1 - YDAPI 核心
+├── test-ydapi/          # P2 - YDAPI 測試環境
+├── watermark-0324/      # P3 - APEX 去水印工具
+├── obsidian/            # 知識庫
+├── docs/                # 項目文檔
+├── scripts/             # 自動化腳本
+└── Archived/            # 歸檔項目
+```
+
 ## Projects
 | P | 項目 | 位置 |
 |---|------|------|
 | **1** | YDAPI (主) | `dexapi/` |
 | **2** | YDAPI (測試) | `test-ydapi/` |
-| **3** | APEX 工具 | `watermark 0324/` |
+| **3** | APEX 工具 | `watermark-0324/` |
 
 ---
 

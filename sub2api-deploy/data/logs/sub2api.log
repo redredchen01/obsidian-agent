@@ -23,3 +23,5 @@
 2026-03-26T12:02:51.614+0800	INFO	service/scheduled_test_runner_service.go:66	[ScheduledTestRunner] started (tick=every minute)	{"service": "sub2api", "env": "production", "component": "service.scheduled_test_runner", "legacy_printf": true}
 2026-03-26T12:02:51.614+0800	INFO	stdlog	server/main.go:96	Server started on 0.0.0.0:8080	{"service": "sub2api", "env": "production", "legacy_stdlog": true}
 2026-03-26T12:12:51.843+0800	INFO	service/pricing_service.go:219	[Pricing] Hash check passed, no update needed	{"service": "sub2api", "env": "production", "component": "service.pricing", "legacy_printf": true}
+2026-03-26T12:22:51.949+0800	INFO	service/pricing_service.go:219	[Pricing] Hash check passed, no update needed	{"service": "sub2api", "env": "production", "component": "service.pricing", "legacy_printf": true}
+2026-03-26T12:38:51.170+0800	INFO	service/pricing_service.go:219	[Pricing] Hash check passed, no update needed	{"service": "sub2api", "env": "production", "component": "service.pricing", "legacy_printf": true}
