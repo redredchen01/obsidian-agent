@@ -2,16 +2,16 @@
   "name": "session-wrap-skill",
   "version": "3.3.0",
   "description": "Universal session wrap-up: automatically persist project context to memory files for seamless resume",
-  "main": "session-wrap.sh",
+  "main": "scripts/session-wrap.sh",
   "scripts": {
-    "wrap": "bash session-wrap.sh",
-    "sync": "bash obsidian-sync.sh"
+    "wrap": "bash scripts/session-wrap.sh",
+    "sync": "bash scripts/obsidian-sync.sh"
   },
   "keywords": ["session", "automation", "memory", "context", "claude-code"],
   "author": "redredchen01",
   "license": "MIT",
   "bin": {
-    "session-wrap": "session-wrap.sh",
-    "obsidian-sync": "obsidian-sync.sh"
+    "session-wrap": "scripts/session-wrap.sh",
+    "obsidian-sync": "scripts/obsidian-sync.sh"
   }
 }

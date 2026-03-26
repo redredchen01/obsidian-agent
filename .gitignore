@@ -18,10 +18,28 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Logs
+*.log
+*.log.*
+logs/
+log/
+
+# Database
+postgres_data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary
+*.tmp
+.pytest_cache/
+__pycache__/
+
 # Local (not tracked)
 /Archived/
 /.claude/
 /obsidian/
 .zshrc-workspace
-login-agents.sh
+.zshrc-wrap
+scripts/login-agents.sh
 .session-wrap-trigger.json
