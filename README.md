@@ -46,6 +46,8 @@ Start here based on your needs:
 | **[PRODUCTION-SETUP.md](PRODUCTION-SETUP.md)** | Deploy backend to Railway/Docker/VPS |
 | **[VISUALIZATION-GUIDE.md](VISUALIZATION-GUIDE.md)** | Visualize tasks, decisions, memory, timeline |
 | **[FAQ-TROUBLESHOOTING.md](FAQ-TROUBLESHOOTING.md)** | Common issues & solutions |
+| **[BENCHMARKS.md](BENCHMARKS.md)** | Productivity metrics & time savings |
+| **[MIGRATION.md](MIGRATION.md)** | Upgrade from v3.3 to v3.4.0 |
 
 ### Real-World Workflow Guides
 
