@@ -1,4 +1,4 @@
-# Session Wrap Skill v3.4.0
+# Session Wrap Skill v3.6.0
 
 **Agent-native session management for seamless multi-agent coordination.**
 
@@ -6,11 +6,15 @@ Automatically persist project context, track decisions, and enable agents to sha
 
 Works with Claude Code, Cursor, Windsurf, Cline, Aider, and any AI agent.
 
-## ✨ What's New (v3.4.0)
+## ✨ What's New (v3.6.0)
 
-Transform from manual session saving → **agent infrastructure** for multi-agent workflows.
+**Phase 6:** Setup automation + Railway deployment + real-time web dashboard
 
-### 7 New Agent Tools
+Transformed from adoption friction → developer-friendly: 15-min setup → 2 min, one-click backend deployment, real-time team monitoring dashboard.
+
+### Agent Tools + Automation (7 tools + 3 automation scripts)
+
+**7 Agent Coordination Tools:**
 
 | Tool | Purpose | Usage |
 |------|---------|-------|
@@ -22,6 +26,14 @@ Transform from manual session saving → **agent infrastructure** for multi-agen
 | **agent-optimize** | Smart memory optimization | `agent-optimize stats/archive/prune` |
 | **agent-tasks** | Task dependency graph | `agent-tasks add/done/next/claim` |
 
+**3 Automation Scripts (Phase 6):**
+
+| Script | Purpose | Speed |
+|--------|---------|-------|
+| **setup.sh** | One-command project initialization | 15 min → 2 min |
+| **deploy-railway.sh** | Automated Railway backend deployment | Manual → 5 min |
+| **web/** (React dashboard) | Real-time team monitoring | New in v3.6.0 |
+
 ## Features
 
 - 🤖 **Agent-native** — 7 tools designed for multi-agent coordination
@@ -32,7 +44,9 @@ Transform from manual session saving → **agent infrastructure** for multi-agen
 - 📚 **Knowledge base** — Persistent project conventions & architecture
 - ⚙️ **Auto-optimize** — Keep memory lean for context windows
 - 🔐 **Git-backed** — Checkpoints with full rollback support
-- 🎯 **Web Dashboard** — Real-time visualization (tasks, decisions, memory, sync status)
+- 🎯 **Web Dashboard** — Real-time team monitoring (React, Vercel-deployed)
+- ⚡ **Setup Automation** — New user setup: 15 min → 2 min
+- 🚀 **One-Click Deployment** — Deploy backend to Railway in 5 minutes
 
 ## 📚 Documentation
 
@@ -423,6 +437,41 @@ agent-knowledge get "architecture"        # Understand design
 
 # No context loss, decisions preserved, work continues seamlessly
 ```
+
+## Changelog
+
+### v3.6.0 (2026-03-26)
+
+**Phase 6: Setup Automation & Deployment Infrastructure**
+
+#### Added
+- 🚀 `scripts/setup.sh` — One-command project initialization (15 min → 2 min)
+- 🔧 `scripts/deploy-railway.sh` — Automated Railway backend deployment
+- 🎯 Web Dashboard (`web/`) — Real-time team monitoring with React + Vite
+  - TaskBoard: Visual task status columns
+  - DecisionTimeline: Chronological decision history
+  - MemoryStats: Usage trends with sparkline charts
+  - SyncStatus: Agent connection monitoring
+  - Vercel deployment ready
+- 📖 `DASHBOARD-DEPLOYMENT-GUIDE.md` — Full deployment documentation
+- 📚 `web/README.md` — Dashboard setup and usage guide
+
+#### Improved
+- README updated with v3.6.0 features
+- Setup process now automatable with shell script
+- Backend deployment scripted (eliminates manual steps)
+
+#### Fixed
+- Path inconsistencies in setup scripts
+
+#### Known Issues
+- Dashboard uses HTTP polling (WebSocket planned for v3.7)
+- Backend endpoints template (implementation required by user)
+
+**Total changes:** 1,207 lines (scripts + dashboard)
+
+### v3.5.1 (2026-03-25)
+- [Previous releases...]
 
 ## License
 
