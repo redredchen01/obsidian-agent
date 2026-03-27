@@ -36,7 +36,12 @@ def _make_sheets(config_path: str):
 def cmd_serve(args: argparse.Namespace) -> None:
     from hr_admin_bots.manager import BotManager
 
-    manager = BotManager(config_path=args.config)
+    health_port = args.health_port if args.health_port > 0 else None
+    manager = BotManager(
+        config_path=args.config,
+        enable_scheduler=not args.no_scheduler,
+        health_port=health_port,
+    )
     manager.run()
 
 
@@ -194,6 +199,19 @@ def main() -> None:
     # serve
     p_serve = sub.add_parser("serve", help="Start all Telegram bots")
     p_serve.add_argument("--config", default="config.json")
+    p_serve.add_argument(
+        "--no-scheduler",
+        action="store_true",
+        default=False,
+        help="Disable the automatic reminder scheduler",
+    )
+    p_serve.add_argument(
+        "--health-port",
+        type=int,
+        default=8080,
+        metavar="PORT",
+        help="HTTP health check port (0 to disable, default: 8080)",
+    )
     p_serve.set_defaults(func=cmd_serve)
 
     # mcp

@@ -35,6 +35,7 @@ class BaseBot:
         auth: Any,
         notifier: Any,
         approval_manager: Any = None,
+        audit_logger: Any = None,
     ) -> None:
         self.name = name
         self.bot_config = bot_config
@@ -42,6 +43,7 @@ class BaseBot:
         self.auth = auth
         self.notifier = notifier
         self.approval_manager = approval_manager
+        self.audit_logger = audit_logger
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """入口指令，歡迎使用者並要求輸入員工編號。"""
@@ -72,6 +74,13 @@ class BaseBot:
         if bound_tid is None:
             # 尚未綁定 — 自動綁定目前使用者
             self.sheets_client.bind_telegram_id(employee_id, current_tid)
+            if self.audit_logger is not None:
+                self.audit_logger.log(
+                    action="telegram_bind",
+                    actor=str(current_tid),
+                    target_employee=employee_id,
+                    details=f"bot={self.name}",
+                )
         elif bound_tid != current_tid:
             await update.message.reply_text(
                 "此員工編號已綁定其他 Telegram 帳號，無法繼續。\n"

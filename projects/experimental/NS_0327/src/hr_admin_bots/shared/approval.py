@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 class ApprovalManager:
     """處理 Telegram 主管核准流程。"""
 
-    def __init__(self, sheets_client: Any, notifier: Any, webhook_notifier: Any = None) -> None:
+    def __init__(self, sheets_client: Any, notifier: Any, webhook_notifier: Any = None, audit_logger: Any = None) -> None:
         self.sheets_client = sheets_client
         self.notifier = notifier
         self.webhook_notifier = webhook_notifier
+        self.audit_logger = audit_logger
 
     async def send_approval_request(
         self,
@@ -110,6 +111,17 @@ class ApprovalManager:
             logger.error("Failed to update leave status: %s", e)
             await query.edit_message_text("更新狀態失敗，請聯絡系統管理員。")
             return
+
+        # Audit log
+        if self.audit_logger is not None:
+            manager_user = query.from_user
+            actor = str(manager_user.id) if manager_user else "unknown"
+            self.audit_logger.log(
+                action=f"leave_{action}",
+                actor=actor,
+                target_employee=str(row_index),
+                details=f"status→{new_status}",
+            )
 
         # Fire webhook notification (non-blocking, best-effort)
         if self.webhook_notifier is not None:
