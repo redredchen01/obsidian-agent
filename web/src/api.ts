@@ -62,6 +62,38 @@ class APIClient {
     }
   }
 
+  // Comments
+  async addComment(taskId: string, content: string, mentions: string[] = []): Promise<any> {
+    try {
+      const res = await this.client.post(`/tasks/${taskId}/comments`, {
+        content,
+        mentions,
+      })
+      return res.data.comment || null
+    } catch (error) {
+      console.error('Failed to add comment:', error)
+      return null
+    }
+  }
+
+  async getComments(taskId: string): Promise<any[]> {
+    try {
+      const res = await this.client.get(`/tasks/${taskId}/comments`)
+      return res.data.comments || []
+    } catch (error) {
+      console.error('Failed to fetch comments:', error)
+      return []
+    }
+  }
+
+  async deleteComment(taskId: string, commentId: string): Promise<void> {
+    try {
+      await this.client.delete(`/tasks/${taskId}/comments/${commentId}`)
+    } catch (error) {
+      console.error('Failed to delete comment:', error)
+    }
+  }
+
   // Decisions
   async getDecisions(filters?: { q?: string; agent?: string; start_date?: string; end_date?: string }): Promise<Decision[]> {
     try {
