@@ -4,7 +4,7 @@
   "description": "CLI toolkit for AI agents to manage Obsidian vaults — journal, notes, search, index sync, and more",
   "type": "module",
   "bin": {
-    "obsidian-agent": "./bin/cli.mjs"
+    "obsidian-agent": "bin/cli.mjs"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs"
@@ -28,7 +28,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/redredchen01/obsidian-agent.git"
+    "url": "git+https://github.com/redredchen01/obsidian-agent.git"
   },
   "engines": {
     "node": ">=18"
