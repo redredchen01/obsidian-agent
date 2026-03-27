@@ -170,13 +170,14 @@ export class Vault {
 
   findRelated(title, tags = []) {
     const notes = this.scanNotes();
-    const titleWords = title.toLowerCase().split(/[\s-]+/);
+    const titleWords = title.toLowerCase().split(/[\s-]+/).filter(w => w.length > 2);
     return notes
       .map(n => {
         let score = 0;
         const nWords = `${n.title} ${n.summary}`.toLowerCase();
         for (const w of titleWords) {
-          if (w.length > 2 && nWords.includes(w)) score += 1;
+          const re = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+          if (re.test(nWords)) score += 1;
         }
         for (const t of tags) {
           if (n.tags.includes(t)) score += 2;

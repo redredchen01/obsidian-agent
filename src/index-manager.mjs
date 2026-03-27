@@ -1,6 +1,8 @@
 /**
  * Index manager — maintains _tags.md, _graph.md, and directory _index.md files
  */
+import { todayStr, prevDate, nextDate } from './dates.mjs';
+
 export class IndexManager {
   constructor(vault) {
     this.vault = vault;
@@ -80,22 +82,4 @@ export class IndexManager {
     const graph = this.rebuildGraph();
     return { ...tags, ...graph };
   }
-}
-
-// ── Date helpers ─────────────────────────────────────
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function prevDate(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00Z');
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
-
-function nextDate(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00Z');
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
 }

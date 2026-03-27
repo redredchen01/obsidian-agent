@@ -156,6 +156,8 @@ related: ["[[other-note]]", "[[another-note]]"]
 | `orphans` | Find notes with no inbound links |
 | `tag list` | List all tags with counts |
 | `tag rename <old> <new>` | Rename a tag across the vault |
+| `patch <note>` | Edit a section by heading (`--heading`, `--append/--prepend/--replace`) |
+| `serve` | Start MCP server (stdio transport) |
 | `hook <event>` | Handle agent hook events |
 
 ### Flags
@@ -172,6 +174,48 @@ related: ["[[other-note]]", "[[another-note]]"]
 | `--month <MM>` | Month for monthly review (1-12) |
 | `--summary <text>` | Set note summary (for update) |
 | `--tags <a,b,c>` | Set tags (for note/update) |
+
+## JSON Output
+
+All commands support `--json` for machine-readable output:
+
+```bash
+obsidian-agent search "API" --json
+obsidian-agent stats --json
+obsidian-agent list project --status active --json
+```
+
+## Heading-Level Edits
+
+Edit specific sections of a note without rewriting the whole file:
+
+```bash
+# Append to a section
+obsidian-agent patch "my-project" --heading "TODO" --append "- [ ] New task"
+
+# Replace section content
+obsidian-agent patch "my-project" --heading "Notes" --replace "Updated notes here"
+
+# Read a section
+obsidian-agent patch "my-project" --heading "TODO"
+```
+
+## MCP Server
+
+Run as an [MCP](https://modelcontextprotocol.io/) server for AI assistants (Claude Desktop, Cursor, etc.):
+
+```json
+{
+  "mcpServers": {
+    "obsidian-agent": {
+      "command": "obsidian-agent",
+      "args": ["serve", "--vault", "/path/to/vault"]
+    }
+  }
+}
+```
+
+Exposes 15 tools: journal, note, capture, search, list, backlinks, update, archive, patch, stats, orphans, graph, sync, tag_list, tag_rename.
 
 ## Agent Hooks
 

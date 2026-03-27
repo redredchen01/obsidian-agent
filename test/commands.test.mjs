@@ -205,4 +205,68 @@ describe('commands (import)', () => {
     assert.ok(content.includes('development'));
     assert.ok(!content.includes('[dev,') && !content.includes('[dev]'));
   });
+
+  // ── v0.3.0 new features ─────────────────────────────
+
+  it('patch appends to heading section', async () => {
+    const { patch } = await import('../src/commands/patch.mjs');
+    const result = patch(TMP, 'test-project', {
+      heading: 'TODO',
+      append: '- [ ] Write integration tests',
+    });
+    assert.equal(result.status, 'patched');
+    assert.equal(result.operation, 'appended');
+    const content = readFileSync(join(TMP, 'projects', 'test-project.md'), 'utf8');
+    assert.ok(content.includes('Write integration tests'));
+  });
+
+  it('patch reads section without modification', async () => {
+    const { patch } = await import('../src/commands/patch.mjs');
+    const result = patch(TMP, 'test-project', { heading: 'TODO' });
+    assert.equal(result.status, 'read');
+    assert.ok(result.content.includes('Write integration tests'));
+  });
+
+  it('patch replaces section content', async () => {
+    const { patch } = await import('../src/commands/patch.mjs');
+    const result = patch(TMP, 'test-project', {
+      heading: 'Notes',
+      replace: 'Replaced content here',
+    });
+    assert.equal(result.operation, 'replaced');
+    const content = readFileSync(join(TMP, 'projects', 'test-project.md'), 'utf8');
+    assert.ok(content.includes('Replaced content here'));
+  });
+
+  it('MCP server handles initialize and tools/list', async () => {
+    const { McpServer } = await import('../src/mcp-server.mjs');
+    const server = new McpServer(TMP);
+
+    const init = server.handleMessage({
+      jsonrpc: '2.0', id: 1,
+      method: 'initialize',
+      params: { protocolVersion: '2024-11-05' },
+    });
+    assert.equal(init.result.serverInfo.name, 'obsidian-agent');
+
+    const tools = server.handleMessage({
+      jsonrpc: '2.0', id: 2,
+      method: 'tools/list',
+      params: {},
+    });
+    assert.ok(tools.result.tools.length >= 10);
+    assert.ok(tools.result.tools.some(t => t.name === 'search'));
+  });
+
+  it('MCP server handles tool calls', async () => {
+    const { McpServer } = await import('../src/mcp-server.mjs');
+    const server = new McpServer(TMP);
+
+    const response = await server.handleMessage({
+      jsonrpc: '2.0', id: 3,
+      method: 'tools/call',
+      params: { name: 'stats', arguments: {} },
+    });
+    assert.ok(response.result.content[0].text.includes('total'));
+  });
 });

@@ -40,17 +40,24 @@ function resolveVault(flags) {
 
 async function main() {
   const { flags, positional } = parseFlags(args.slice(1));
+  const jsonMode = flags.json === true;
+
+  // In JSON mode, suppress console.log and capture return values
+  const origLog = console.log;
+  if (jsonMode) console.log = () => {};
+
+  let result;
 
   switch (command) {
     case 'init': {
       const { init } = await import('../src/commands/init.mjs');
-      init(positional[0] || '.');
+      result = init(positional[0] || '.');
       break;
     }
 
     case 'journal': {
       const { journal } = await import('../src/commands/journal.mjs');
-      journal(resolveVault(flags), { date: flags.date });
+      result = journal(resolveVault(flags), { date: flags.date });
       break;
     }
 
@@ -64,7 +71,7 @@ async function main() {
         process.exit(1);
       }
       const tags = flags.tags ? flags.tags.split(',') : [];
-      note(resolveVault(flags), title, type, { tags, goal: flags.goal, summary: flags.summary });
+      result = note(resolveVault(flags), title, type, { tags, goal: flags.goal, summary: flags.summary });
       break;
     }
 
@@ -75,13 +82,13 @@ async function main() {
         console.error('Usage: obsidian-agent capture <idea text>');
         process.exit(1);
       }
-      capture(resolveVault(flags), idea);
+      result = capture(resolveVault(flags), idea);
       break;
     }
 
     case 'search': {
       const { search } = await import('../src/commands/search.mjs');
-      search(resolveVault(flags), positional[0], {
+      result = search(resolveVault(flags), positional[0], {
         type: flags.type,
         tag: flags.tag,
         status: flags.status,
@@ -91,7 +98,7 @@ async function main() {
 
     case 'list': {
       const { list } = await import('../src/commands/list.mjs');
-      list(resolveVault(flags), {
+      result = list(resolveVault(flags), {
         type: positional[0],
         tag: flags.tag,
         status: flags.status,
@@ -103,32 +110,32 @@ async function main() {
     case 'review': {
       if (positional[0] === 'monthly') {
         const { monthlyReview } = await import('../src/commands/review.mjs');
-        monthlyReview(resolveVault(flags), {
+        result = monthlyReview(resolveVault(flags), {
           year: flags.year ? parseInt(flags.year) : undefined,
           month: flags.month ? parseInt(flags.month) : undefined,
         });
       } else {
         const { review } = await import('../src/commands/review.mjs');
-        review(resolveVault(flags), { date: flags.date });
+        result = review(resolveVault(flags), { date: flags.date });
       }
       break;
     }
 
     case 'sync': {
       const { sync } = await import('../src/commands/sync.mjs');
-      sync(resolveVault(flags));
+      result = sync(resolveVault(flags));
       break;
     }
 
     case 'backlinks': {
       const { backlinks } = await import('../src/commands/backlinks.mjs');
-      backlinks(resolveVault(flags), positional[0]);
+      result = backlinks(resolveVault(flags), positional[0]);
       break;
     }
 
     case 'update': {
       const { update } = await import('../src/commands/update.mjs');
-      update(resolveVault(flags), positional[0], {
+      result = update(resolveVault(flags), positional[0], {
         status: flags.status,
         tags: flags.tags,
         tag: flags.tag,
@@ -139,25 +146,36 @@ async function main() {
 
     case 'archive': {
       const { archive } = await import('../src/commands/archive.mjs');
-      archive(resolveVault(flags), positional[0]);
+      result = archive(resolveVault(flags), positional[0]);
       break;
     }
 
     case 'stats': {
       const { stats } = await import('../src/commands/stats.mjs');
-      stats(resolveVault(flags));
+      result = stats(resolveVault(flags));
       break;
     }
 
     case 'graph': {
       const { graph } = await import('../src/commands/graph.mjs');
-      graph(resolveVault(flags), { type: flags.type });
+      result = graph(resolveVault(flags), { type: flags.type });
       break;
     }
 
     case 'orphans': {
       const { orphans } = await import('../src/commands/orphans.mjs');
-      orphans(resolveVault(flags));
+      result = orphans(resolveVault(flags));
+      break;
+    }
+
+    case 'patch': {
+      const { patch } = await import('../src/commands/patch.mjs');
+      result = patch(resolveVault(flags), positional[0], {
+        heading: flags.heading,
+        append: flags.append,
+        prepend: flags.prepend,
+        replace: flags.replace,
+      });
       break;
     }
 
@@ -165,15 +183,22 @@ async function main() {
       const subcmd = positional[0];
       if (subcmd === 'rename') {
         const { tagRename } = await import('../src/commands/tag.mjs');
-        tagRename(resolveVault(flags), positional[1], positional[2]);
+        result = tagRename(resolveVault(flags), positional[1], positional[2]);
       } else if (subcmd === 'list') {
         const { tagList } = await import('../src/commands/tag.mjs');
-        tagList(resolveVault(flags));
+        result = tagList(resolveVault(flags));
       } else {
         console.error('Usage: obsidian-agent tag <rename|list>');
         process.exit(1);
       }
       break;
+    }
+
+    case 'serve': {
+      const { McpServer } = await import('../src/mcp-server.mjs');
+      const server = new McpServer(resolveVault(flags));
+      server.start();
+      return; // Don't exit — server runs indefinitely
     }
 
     case 'hook': {
@@ -232,8 +257,10 @@ Commands:
   stats                    Show vault statistics
   graph                    Generate Mermaid knowledge graph
   orphans                  Find notes with no inbound links
+  patch <note>             Edit a section by heading
   tag list                 List all tags with counts
   tag rename <old> <new>   Rename a tag across the vault
+  serve                    Start MCP server (stdio transport)
   hook <event>             Handle agent hook events
 
 Flags:
@@ -245,6 +272,12 @@ Flags:
   --date <YYYY-MM-DD>      Specify date for journal/review
   --year <YYYY>            Year for monthly review
   --month <MM>             Month for monthly review (1-12)
+  --summary <text>         Set note summary
+  --tags <a,b,c>           Set tags
+  --json                   Output as JSON (machine-readable)
+  --heading <name>         Target heading (for patch)
+  --append <text>          Append to section (for patch)
+  --prepend <text>         Prepend to section (for patch)
 
 Hook events:
   session-stop             Append session summary to journal
@@ -271,6 +304,12 @@ Examples:
       console.error(`Unknown command: ${command}`);
       console.error('Run "obsidian-agent help" for usage.');
       process.exit(1);
+  }
+
+  // JSON output mode
+  if (jsonMode && result !== undefined) {
+    console.log = origLog;
+    console.log(JSON.stringify(result, null, 2));
   }
 }
 
