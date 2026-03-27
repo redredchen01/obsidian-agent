@@ -13,8 +13,7 @@ export function note(vaultRoot, title, type, { tags = [], goal = '', summary = '
 
   const validTypes = ['area', 'project', 'resource', 'idea'];
   if (!validTypes.includes(type)) {
-    console.error(`Invalid type: ${type}. Must be one of: ${validTypes.join(', ')}`);
-    process.exit(1);
+    throw new Error(`Invalid type: ${type}. Must be one of: ${validTypes.join(', ')}`);
   }
 
   const filename = title.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-').replace(/(^-|-$)/g, '');

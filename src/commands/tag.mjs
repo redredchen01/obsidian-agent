@@ -10,8 +10,7 @@ export function tagRename(vaultRoot, oldTag, newTag) {
   const idx = new IndexManager(vault);
 
   if (!oldTag || !newTag) {
-    console.error('Usage: obsidian-agent tag rename <old-tag> <new-tag>');
-    process.exit(1);
+    throw new Error('Usage: obsidian-agent tag rename <old-tag> <new-tag>');
   }
 
   const notes = vault.scanNotes();

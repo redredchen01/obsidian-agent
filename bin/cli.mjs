@@ -18,14 +18,19 @@
 const args = process.argv.slice(2);
 const command = args[0];
 
-// Parse flags
+// Parse flags (supports --flag value and --flag=value)
 function parseFlags(args) {
   const flags = {};
   const positional = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith('--')) {
-      const key = args[i].slice(2);
-      flags[key] = args[i + 1] && !args[i + 1].startsWith('--') ? args[++i] : true;
+      const eqIdx = args[i].indexOf('=');
+      if (eqIdx !== -1) {
+        flags[args[i].slice(2, eqIdx)] = args[i].slice(eqIdx + 1);
+      } else {
+        const key = args[i].slice(2);
+        flags[key] = args[i + 1] && !args[i + 1].startsWith('--') ? args[++i] : true;
+      }
     } else {
       positional.push(args[i]);
     }

@@ -7,8 +7,7 @@ export function search(vaultRoot, keyword, { type, tag, status } = {}) {
   const vault = new Vault(vaultRoot);
 
   if (!keyword) {
-    console.error('Usage: obsidian-agent search <keyword> [--type TYPE] [--tag TAG] [--status STATUS]');
-    process.exit(1);
+    throw new Error('Usage: obsidian-agent search <keyword> [--type TYPE] [--tag TAG] [--status STATUS]');
   }
 
   const results = vault.search(keyword, { type, tag, status });

@@ -4,10 +4,16 @@
  * Implements Model Context Protocol (JSON-RPC 2.0 over stdio)
  * Zero dependencies — raw readline + JSON parsing
  */
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { Vault } from './vault.mjs';
 import { TemplateEngine } from './templates.mjs';
 import { IndexManager } from './index-manager.mjs';
 import { todayStr, weekdayShort, prevDate, nextDate, getWeekDates, getWeekLabel, getMonthRange } from './dates.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PKG_VERSION = JSON.parse(readFileSync(resolve(__dirname, '..', 'package.json'), 'utf8')).version;
 
 const TOOLS = [
   {
@@ -326,7 +332,7 @@ export class McpServer {
           result: {
             protocolVersion: '2024-11-05',
             capabilities: { tools: {} },
-            serverInfo: { name: 'obsidian-agent', version: '0.5.0' },
+            serverInfo: { name: 'obsidian-agent', version: PKG_VERSION },
           },
         };
 

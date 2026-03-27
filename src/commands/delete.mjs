@@ -11,15 +11,13 @@ export function deleteNote(vaultRoot, noteName) {
   const idx = new IndexManager(vault);
 
   if (!noteName) {
-    console.error('Usage: obsidian-agent delete <note-name>');
-    process.exit(1);
+    throw new Error('Usage: obsidian-agent delete <note-name>');
   }
 
   const notes = vault.scanNotes();
   const note = notes.find(n => n.file === noteName);
   if (!note) {
-    console.error(`Note not found: ${noteName}`);
-    process.exit(1);
+    throw new Error(`Note not found: ${noteName}`);
   }
 
   const filePath = vault.path(note.dir, `${note.file}.md`);
@@ -47,6 +45,7 @@ export function deleteNote(vaultRoot, noteName) {
 
   // Delete the file
   unlinkSync(filePath);
+  vault.invalidateCache();
 
   // Rebuild indices
   idx.sync();

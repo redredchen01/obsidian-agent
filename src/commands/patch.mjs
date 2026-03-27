@@ -8,23 +8,20 @@ export function patch(vaultRoot, noteName, { heading, append, prepend, replace }
   const vault = new Vault(vaultRoot);
 
   if (!noteName || !heading) {
-    console.error('Usage: obsidian-agent patch <note> --heading "Section" [--append|--prepend|--replace TEXT]');
-    process.exit(1);
+    throw new Error('Usage: obsidian-agent patch <note> --heading "Section" [--append|--prepend|--replace TEXT]');
   }
 
   // Find the note
   const notes = vault.scanNotes();
   const note = notes.find(n => n.file === noteName);
   if (!note) {
-    console.error(`Note not found: ${noteName}`);
-    process.exit(1);
+    throw new Error(`Note not found: ${noteName}`);
   }
 
   const filePath = `${note.dir}/${note.file}.md`;
   let content = vault.read(filePath);
   if (!content) {
-    console.error(`Cannot read: ${filePath}`);
-    process.exit(1);
+    throw new Error(`Cannot read: ${filePath}`);
   }
 
   // Find heading and its content boundaries
@@ -58,8 +55,7 @@ export function patch(vaultRoot, noteName, { heading, append, prepend, replace }
   }
 
   if (startIdx === -1) {
-    console.error(`Heading not found: "${heading}"`);
-    process.exit(1);
+    throw new Error(`Heading not found: "${heading}"`);
   }
 
   // Extract section content (lines between heading and next heading)

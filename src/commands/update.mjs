@@ -10,16 +10,14 @@ export function update(vaultRoot, noteName, { status, tags, summary, tag } = {})
   const idx = new IndexManager(vault);
 
   if (!noteName) {
-    console.error('Usage: obsidian-agent update <note-name> [--status STATUS] [--tags TAG1,TAG2] [--summary TEXT]');
-    process.exit(1);
+    throw new Error('Usage: obsidian-agent update <note-name> [--status STATUS] [--tags TAG1,TAG2] [--summary TEXT]');
   }
 
   // Find the note
   const notes = vault.scanNotes();
   const note = notes.find(n => n.file === noteName);
   if (!note) {
-    console.error(`Note not found: ${noteName}`);
-    process.exit(1);
+    throw new Error(`Note not found: ${noteName}`);
   }
 
   const updates = { updated: todayStr() };

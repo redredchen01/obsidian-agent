@@ -10,15 +10,13 @@ export function archive(vaultRoot, noteName) {
   const idx = new IndexManager(vault);
 
   if (!noteName) {
-    console.error('Usage: obsidian-agent archive <note-name>');
-    process.exit(1);
+    throw new Error('Usage: obsidian-agent archive <note-name>');
   }
 
   const notes = vault.scanNotes();
   const note = notes.find(n => n.file === noteName);
   if (!note) {
-    console.error(`Note not found: ${noteName}`);
-    process.exit(1);
+    throw new Error(`Note not found: ${noteName}`);
   }
 
   if (note.status === 'archived') {

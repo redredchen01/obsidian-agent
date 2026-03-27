@@ -7,22 +7,19 @@ export function read(vaultRoot, noteName, { section } = {}) {
   const vault = new Vault(vaultRoot);
 
   if (!noteName) {
-    console.error('Usage: obsidian-agent read <note-name> [--section HEADING]');
-    process.exit(1);
+    throw new Error('Usage: obsidian-agent read <note-name> [--section HEADING]');
   }
 
   // Find the note
   const notes = vault.scanNotes();
   const note = notes.find(n => n.file === noteName);
   if (!note) {
-    console.error(`Note not found: ${noteName}`);
-    process.exit(1);
+    throw new Error(`Note not found: ${noteName}`);
   }
 
   const content = vault.read(note.dir, `${note.file}.md`);
   if (!content) {
-    console.error(`Cannot read: ${note.dir}/${note.file}.md`);
-    process.exit(1);
+    throw new Error(`Cannot read: ${note.dir}/${note.file}.md`);
   }
 
   if (section) {
@@ -48,8 +45,7 @@ export function read(vaultRoot, noteName, { section } = {}) {
     }
 
     if (startIdx === -1) {
-      console.error(`Section not found: "${section}"`);
-      process.exit(1);
+      throw new Error(`Section not found: "${section}"`);
     }
 
     const sectionContent = lines.slice(startIdx, endIdx).join('\n').trim();

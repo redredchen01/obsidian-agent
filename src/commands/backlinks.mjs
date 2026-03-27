@@ -7,8 +7,7 @@ export function backlinks(vaultRoot, noteName) {
   const vault = new Vault(vaultRoot);
 
   if (!noteName) {
-    console.error('Usage: obsidian-agent backlinks <note-name>');
-    process.exit(1);
+    throw new Error('Usage: obsidian-agent backlinks <note-name>');
   }
 
   const results = vault.backlinks(noteName);

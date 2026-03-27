@@ -8,6 +8,13 @@ export class Vault {
   constructor(root) {
     this.root = resolve(root);
     this.dirs = ['areas', 'projects', 'resources', 'journal', 'ideas'];
+    this._notesCache = null;
+    this._notesCacheWithBody = null;
+  }
+
+  invalidateCache() {
+    this._notesCache = null;
+    this._notesCacheWithBody = null;
   }
 
   // ── Path helpers ─────────────────────────────────────
@@ -33,6 +40,7 @@ export class Vault {
     const dir = p.substring(0, p.lastIndexOf('/'));
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(p, content);
+    this.invalidateCache();
   }
 
   // ── Frontmatter parsing ──────────────────────────────
@@ -63,9 +71,12 @@ export class Vault {
     return content.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
   }
 
-  // ── Scan all notes ───────────────────────────────────
+  // ── Scan all notes (cached) ──────────────────────────
 
   scanNotes({ includeBody = false } = {}) {
+    const cacheKey = includeBody ? '_notesCacheWithBody' : '_notesCache';
+    if (this[cacheKey]) return this[cacheKey];
+
     const notes = [];
     for (const dir of this.dirs) {
       const dirPath = this.path(dir);
@@ -91,6 +102,7 @@ export class Vault {
         notes.push(note);
       }
     }
+    this[cacheKey] = notes;
     return notes;
   }
 
@@ -150,19 +162,23 @@ export class Vault {
     return true;
   }
 
-  // ── Vault stats ──────────────────────────────────────
+  // ── Vault stats (single-pass, no rescan) ────────────
 
   stats() {
-    const notes = this.scanNotes();
+    const notes = this.scanNotes({ includeBody: true });
     const byType = {};
     const byStatus = {};
     const byTag = {};
+    const linked = new Set();
     for (const n of notes) {
       byType[n.type] = (byType[n.type] || 0) + 1;
       byStatus[n.status] = (byStatus[n.status] || 0) + 1;
       for (const t of n.tags) byTag[t] = (byTag[t] || 0) + 1;
+      for (const rel of n.related) linked.add(rel);
+      const wikilinks = (n.body || '').match(/\[\[([^\]]+)\]\]/g) || [];
+      for (const wl of wikilinks) linked.add(wl.slice(2, -2));
     }
-    const orphanCount = this.orphans().length;
+    const orphanCount = notes.filter(n => !linked.has(n.file) && n.type !== 'journal').length;
     return { total: notes.length, byType, byStatus, byTag, orphans: orphanCount };
   }
 
