@@ -6,6 +6,7 @@ const { initDB } = require('./db/init');
 const authRoutes = require('./routes/auth');
 const wrapRoutes = require('./routes/wraps');
 const userRoutes = require('./routes/users');
+const rbacRoutes = require('./routes/rbac');
 const { errorHandler } = require('./middleware/errorHandler');
 const { autoAuthenticateAgent } = require('./middleware/agent-auth');
 
@@ -35,6 +36,7 @@ app.use(autoAuthenticateAgent);
 // Protected routes (after auth middleware)
 app.use('/api/wraps', wrapRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api', rbacRoutes);
 
 // Error handling
 app.use(errorHandler);

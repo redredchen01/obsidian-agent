@@ -50,11 +50,133 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Workspaces (Phase 8A - RBAC)
+CREATE TABLE IF NOT EXISTS workspaces (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  is_public BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Roles (Phase 8A - RBAC)
+CREATE TABLE IF NOT EXISTS roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(50) UNIQUE NOT NULL,
+  description TEXT,
+  permissions JSONB DEFAULT '{}',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User Roles (Phase 8A - RBAC)
+CREATE TABLE IF NOT EXISTS user_roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+  granted_by UUID REFERENCES users(id),
+  granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, role_id, workspace_id)
+);
+
+-- Resource Permissions (Phase 8A - RBAC)
+CREATE TABLE IF NOT EXISTS resource_permissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  resource_type VARCHAR(50),
+  resource_id UUID,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
+  permission VARCHAR(50),
+  granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(resource_type, resource_id, user_id, permission)
+);
+
+-- Analytics Snapshots (Phase 8B)
+CREATE TABLE IF NOT EXISTS analytics_snapshots (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  snapshot_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  total_tasks INT DEFAULT 0,
+  completed_tasks INT DEFAULT 0,
+  pending_tasks INT DEFAULT 0,
+  in_progress_tasks INT DEFAULT 0,
+  avg_completion_time INTERVAL,
+  total_decisions INT DEFAULT 0,
+  avg_decision_quality NUMERIC(3,2),
+  active_agents INT DEFAULT 0,
+  agent_participation JSONB DEFAULT '{}',
+  memory_usage JSONB DEFAULT '{}',
+  PRIMARY KEY(workspace_id, snapshot_date)
+);
+
+-- Decision Analytics (Phase 8B)
+CREATE TABLE IF NOT EXISTS decision_analytics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  decision_id VARCHAR(255),
+  agent VARCHAR(100),
+  sentiment_score NUMERIC(3,2),
+  complexity_score NUMERIC(3,2),
+  reasoning_quality NUMERIC(3,2),
+  follow_up_required BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Agent Performance (Phase 8B)
+CREATE TABLE IF NOT EXISTS agent_performance (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  agent_name VARCHAR(100),
+  date DATE,
+  tasks_created INT DEFAULT 0,
+  tasks_completed INT DEFAULT 0,
+  comments_added INT DEFAULT 0,
+  decisions_logged INT DEFAULT 0,
+  response_time_ms INT,
+  error_count INT DEFAULT 0,
+  UNIQUE(workspace_id, agent_name, date)
+);
+
+-- Integrations (Phase 8C)
+CREATE TABLE IF NOT EXISTS integrations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  service_name VARCHAR(50),
+  config JSONB NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(workspace_id, service_name)
+);
+
+-- Integration Events (Phase 8C)
+CREATE TABLE IF NOT EXISTS integration_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  integration_id UUID REFERENCES integrations(id) ON DELETE CASCADE,
+  event_type VARCHAR(50),
+  status VARCHAR(20),
+  payload JSONB,
+  error_message TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_wraps_user_id ON session_wraps(user_id);
 CREATE INDEX IF NOT EXISTS idx_wraps_created_at ON session_wraps(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON claude_subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_token ON api_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_workspaces_owner ON workspaces(owner_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_workspace ON user_roles(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_resource_perms_resource ON resource_permissions(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_workspace ON analytics_snapshots(workspace_id, snapshot_date DESC);
+CREATE INDEX IF NOT EXISTS idx_decision_analytics_workspace ON decision_analytics(workspace_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_perf_workspace ON agent_performance(workspace_id, agent_name, date DESC);
+CREATE INDEX IF NOT EXISTS idx_integrations_workspace ON integrations(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_integration_events_workspace ON integration_events(workspace_id, created_at DESC);
 `;
 
 async function initDB() {
