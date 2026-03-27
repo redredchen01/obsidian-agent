@@ -52,8 +52,9 @@ class LeaveBot(BaseBot):
         auth: Any,
         notifier: Any,
         approval_manager: Any = None,
+        audit_logger: Any = None,
     ) -> None:
-        super().__init__(name, bot_config, sheets_client, auth, notifier, approval_manager)
+        super().__init__(name, bot_config, sheets_client, auth, notifier, approval_manager, audit_logger)
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await update.message.reply_text(
@@ -244,6 +245,15 @@ class LeaveBot(BaseBot):
         try:
             self.sheets_client.append_row("leaves", row)
 
+            # Audit
+            if self.audit_logger is not None:
+                self.audit_logger.log(
+                    action="leave_submit",
+                    actor=str(update.effective_user.id),
+                    target_employee=employee.get("employee_id", ""),
+                    details=f"{row['leave_type']} {row['start_date']}~{row['end_date']} ({row['days']}天)",
+                )
+
             # 取得剛寫入的 row index（最後一筆資料 row）
             ws = self.sheets_client.get_worksheet("leaves")
             records = ws.get_all_records()
@@ -364,6 +374,78 @@ class LeaveBot(BaseBot):
             used = self._get_used_days(employee_id, leave_type)
             remaining = max(quota - used, 0)
             lines.append(f"• {leave_type}：年度配額 {quota} 天，已用 {used} 天，剩餘 {remaining} 天")
+
+        await update.message.reply_text("\n".join(lines))
+
+    async def stats_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """顯示 HR 統計：本月申請數、狀態分布、平均審核時間、各假別使用率。"""
+        try:
+            all_rows = self.sheets_client.find_rows("leaves")
+        except Exception as e:
+            logger.error("stats_command query error: %s", e)
+            await update.message.reply_text("查詢統計資料失敗，請稍後再試。")
+            return
+
+        today = date.today()
+        current_month_prefix = today.strftime("%Y-%m")
+
+        # 本月申請
+        monthly_rows = [r for r in all_rows if r.get("apply_date", "").startswith(current_month_prefix)]
+
+        # 狀態分布（全部）
+        status_count: dict[str, int] = {}
+        for r in all_rows:
+            s = str(r.get("status", "unknown"))
+            status_count[s] = status_count.get(s, 0) + 1
+
+        # 本月各假別申請數
+        type_count: dict[str, int] = {}
+        for r in monthly_rows:
+            lt = str(r.get("leave_type", "未知"))
+            type_count[lt] = type_count.get(lt, 0) + 1
+
+        # 平均審核時間（有 apply_date 且 status 非 pending 的記錄）
+        approval_durations: list[float] = []
+        for r in all_rows:
+            if r.get("status") not in ("approved", "rejected"):
+                continue
+            apply_str = r.get("apply_date", "")
+            approved_str = r.get("approved_at", "")
+            if not apply_str or not approved_str:
+                continue
+            try:
+                t0 = datetime.fromisoformat(apply_str)
+                t1 = datetime.fromisoformat(approved_str)
+                hours = (t1 - t0).total_seconds() / 3600
+                if hours >= 0:
+                    approval_durations.append(hours)
+            except ValueError:
+                continue
+
+        avg_hours = (
+            sum(approval_durations) / len(approval_durations)
+            if approval_durations
+            else None
+        )
+
+        # 組合訊息
+        lines = [f"HR 請假統計（截至 {today}）\n"]
+        lines.append(f"本月申請總數：{len(monthly_rows)} 筆")
+
+        if type_count:
+            lines.append("\n本月假別分布：")
+            for lt, cnt in sorted(type_count.items(), key=lambda x: -x[1]):
+                lines.append(f"  {lt}：{cnt} 筆")
+
+        lines.append("\n全部申請狀態：")
+        label_map = {"pending": "待審中", "approved": "已核准", "rejected": "已駁回"}
+        for s, cnt in sorted(status_count.items(), key=lambda x: -x[1]):
+            lines.append(f"  {label_map.get(s, s)}：{cnt} 筆")
+
+        if avg_hours is not None:
+            lines.append(f"\n平均審核時間：{avg_hours:.1f} 小時")
+        else:
+            lines.append("\n平均審核時間：資料不足")
 
         await update.message.reply_text("\n".join(lines))
 
@@ -496,6 +578,7 @@ class LeaveBot(BaseBot):
         app.add_handler(self.build_conversation_handler())
         app.add_handler(CommandHandler("status", self.status_command))
         app.add_handler(CommandHandler("balance", self.balance_command))
+        app.add_handler(CommandHandler("stats", self.stats_command))
 
         if self.approval_manager is not None:
             app.add_handler(

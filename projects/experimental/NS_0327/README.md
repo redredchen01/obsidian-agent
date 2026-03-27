@@ -2,7 +2,7 @@
 
 4 個 Telegram Bot 組成的 HR 行政自動化工具包，統一經理器啟動，Google Sheets 作為數據層。
 
-**版本：v0.3.0**
+**版本：v0.4.0**
 
 ## Bot 清單
 
@@ -29,7 +29,7 @@ pip install -e .
 
 ## Google Sheet 結構
 
-需要 1 個 Spreadsheet，包含 5 個 Worksheet：
+需要 1 個 Spreadsheet，包含 6 個 Worksheet：
 
 | Worksheet | 用途 |
 |-----------|------|
@@ -38,12 +38,43 @@ pip install -e .
 | work_permits | 工作證申請記錄 |
 | leaves | 請假記錄 |
 | offboarding | 離職記錄 |
+| audit_log | 操作稽核記錄（自動寫入） |
+
+## Docker 部署
+
+```bash
+# 1. 複製環境變數範本
+cp .env.example .env
+# 2. 填入 .env 與 config.json、credentials.json
+# 3. 啟動所有服務
+docker-compose up -d
+
+# 查看健康狀態
+curl http://localhost:8080/
+# 回應範例：{"healthy": true, "bots_running": 4, "uptime_seconds": 120}
+```
+
+## 健康檢查（Health Check）
+
+服務啟動後會在 port 8080 提供 HTTP health check，適用於 Docker/k8s 存活探針：
+
+```
+GET http://localhost:8080/
+→ 200 {"healthy": true, "bots_running": 4, "uptime_seconds": 300}
+→ 503 (不健康時)
+```
+
+使用 `--health-port 0` 可停用：
+
+```bash
+hr-admin-bots serve --health-port 0
+```
 
 ## CLI 指令
 
 ```bash
 # 啟動所有 Telegram Bot
-hr-admin-bots serve [--config config.json]
+hr-admin-bots serve [--config config.json] [--no-scheduler] [--health-port 8080]
 
 # 啟動 MCP Server（供 AI agent 使用）
 hr-admin-bots mcp [--config config.json]
@@ -60,6 +91,30 @@ hr-admin-bots status <employee_id> [--config config.json]
 # 顯示版本
 hr-admin-bots version
 ```
+
+## 自動提醒排程器
+
+`serve` 指令啟動後會同時啟動背景排程器（預設每 6 小時檢查一次）：
+
+| 規則 | 觸發條件 | 通知對象 |
+|------|---------|---------|
+| 請假待審提醒 | 待審超過 48 小時 | 主管（email 或 Telegram） |
+| 離職待處理提醒 | 待審超過 72 小時 | HR |
+| 假期即將到期 | 已核准假期 3 天內結束 | 員工 |
+
+停用排程器：`hr-admin-bots serve --no-scheduler`
+
+## 操作稽核（Audit Trail）
+
+所有 HR 操作自動寫入 Google Sheets 的 `audit_log` 工作表：
+
+| 欄位 | 說明 |
+|------|------|
+| timestamp | 操作時間（ISO 8601） |
+| action | 操作類型（leave_submit、leave_approve、telegram_bind 等） |
+| actor | 執行者（Telegram user ID 或系統） |
+| target_employee | 被操作的員工 ID |
+| details | 額外說明 |
 
 ## MCP Server
 
@@ -87,6 +142,18 @@ python -m hr_admin_bots.mcp_server --config config.json
 | `hr_submit_onboarding` | 提交入職記錄 |
 | `hr_submit_work_permit` | 提交工作證申請 |
 | `hr_submit_offboarding` | 提交離職申請 |
+
+## Leave Bot 指令
+
+Leave Bot 支援以下 Telegram 指令：
+
+| 指令 | 說明 |
+|------|------|
+| `/start` | 開始請假申請流程 |
+| `/status` | 查看個人近期請假紀錄 |
+| `/balance` | 查看各假別剩餘天數 |
+| `/stats` | 顯示 HR 統計（本月申請數、狀態分布、平均審核時間） |
+| `/cancel` | 取消當前操作 |
 
 ### Claude Code 整合範例（.mcp.json）
 

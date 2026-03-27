@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import argparse
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from hr_admin_bots.config import Config
 from hr_admin_bots.bots.onboarding import OnboardingBot
@@ -15,6 +14,9 @@ from hr_admin_bots.shared.auth import EmployeeAuth
 from hr_admin_bots.shared.notifier import EmailNotifier
 from hr_admin_bots.shared.approval import ApprovalManager
 from hr_admin_bots.shared.webhook import WebhookNotifier
+from hr_admin_bots.shared.audit import AuditLogger
+from hr_admin_bots.scheduler import ReminderScheduler
+from hr_admin_bots.health import start_health_server, update_health_status
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +32,15 @@ BOT_REGISTRY = {
 class BotManager:
     """管理所有 HR Bot 的生命週期：載入設定、建立實例、並行執行。"""
 
-    def __init__(self, config_path: str = "config.json") -> None:
+    def __init__(
+        self,
+        config_path: str = "config.json",
+        enable_scheduler: bool = True,
+        health_port: Optional[int] = 8080,
+    ) -> None:
         self.config = Config.from_json(config_path)
+        self.enable_scheduler = enable_scheduler
+        self.health_port = health_port
 
         # 共用 client 實例（各 bot 共享，避免重複連線）
         self.sheets_client: SheetsClient = SheetsClient(
@@ -40,6 +49,7 @@ class BotManager:
         )
         self.auth: EmployeeAuth = EmployeeAuth(sheets_client=self.sheets_client)
         self.notifier: EmailNotifier = EmailNotifier(self.config)
+        self.audit_logger: AuditLogger = AuditLogger(self.sheets_client)
 
         webhook_notifier = None
         if self.config.webhooks:
@@ -47,6 +57,13 @@ class BotManager:
             logger.info("webhook notifier configured with %d URL(s)", len(self.config.webhooks))
 
         self.approval_manager: ApprovalManager = ApprovalManager(
+            sheets_client=self.sheets_client,
+            notifier=self.notifier,
+            webhook_notifier=webhook_notifier,
+            audit_logger=self.audit_logger,
+        )
+
+        self.scheduler: ReminderScheduler = ReminderScheduler(
             sheets_client=self.sheets_client,
             notifier=self.notifier,
             webhook_notifier=webhook_notifier,
@@ -72,16 +89,25 @@ class BotManager:
                 auth=self.auth,
                 notifier=self.notifier,
                 approval_manager=self.approval_manager,
+                audit_logger=self.audit_logger,
             )
             instances.append(instance)
             logger.info("bot '%s' created", name)
         return instances
 
     async def start_all(self) -> None:
-        """並行啟動所有 bot，直到全部結束或其中一個發生例外。"""
+        """並行啟動所有 bot（以及 scheduler），直到全部結束或其中一個發生例外。"""
         if not self.bots:
             logger.warning("no bots to start")
             return
+
+        # 啟動 health check server（背景執行緒，不阻塞 event loop）
+        if self.health_port is not None:
+            try:
+                start_health_server(self.health_port)
+                update_health_status(bots_running=len(self.bots))
+            except Exception as e:
+                logger.warning("Failed to start health server: %s", e)
 
         applications = [bot.build_application() for bot in self.bots]
 
@@ -92,10 +118,16 @@ class BotManager:
             # 保持執行直到被中斷
             await asyncio.Event().wait()
 
+        # 組合任務：bots + scheduler（若啟用）
+        tasks = [run_app(app) for app in applications]
+        if self.enable_scheduler:
+            tasks.append(self.scheduler.start())
+
         try:
-            await asyncio.gather(*(run_app(app) for app in applications))
+            await asyncio.gather(*tasks)
         except (KeyboardInterrupt, SystemExit):
             logger.info("shutting down all bots")
+            self.scheduler.stop()
             for app in applications:
                 try:
                     await app.updater.stop()
@@ -114,6 +146,8 @@ class BotManager:
 
 
 def main() -> None:
+    import argparse
+
     parser = argparse.ArgumentParser(description="HR Admin Bot Manager")
     parser.add_argument(
         "--config",
