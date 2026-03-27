@@ -272,6 +272,13 @@ describe('commands (import)', () => {
     assert.ok(content.includes('Replaced content here'));
   });
 
+  it('setup installs skill and MCP config', async () => {
+    const { setup } = await import('../src/commands/setup.mjs');
+    const result = setup(TMP);
+    assert.equal(result.status, 'ok');
+    assert.ok(result.results.length >= 1);
+  });
+
   it('MCP server handles initialize and tools/list', async () => {
     const { McpServer } = await import('../src/mcp-server.mjs');
     const server = new McpServer(TMP);

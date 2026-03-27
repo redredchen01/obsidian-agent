@@ -155,4 +155,47 @@ related: []
     assert.ok(s.byType.project >= 1);
     assert.ok(typeof s.orphans === 'number');
   });
+
+  // ── v0.6.0 ──────────────────────────────────────────
+
+  it('findNote exact match', () => {
+    const note = vault.findNote('build-api');
+    assert.ok(note);
+    assert.equal(note.file, 'build-api');
+  });
+
+  it('findNote case-insensitive', () => {
+    const note = vault.findNote('Build-API');
+    assert.ok(note);
+    assert.equal(note.file, 'build-api');
+  });
+
+  it('findNote partial match', () => {
+    const note = vault.findNote('vector');
+    assert.ok(note);
+    assert.equal(note.file, 'vector-search');
+  });
+
+  it('findNote returns null for missing', () => {
+    assert.equal(vault.findNote('nonexistent-note'), null);
+  });
+
+  it('search scores title matches higher', () => {
+    const results = vault.search('API');
+    assert.ok(results.length >= 1);
+    assert.equal(results[0].file, 'build-api');
+  });
+
+  it('parseFrontmatter handles colons in values', () => {
+    const content = '---\ntitle: "Build API: v2"\ntype: project\n---\n';
+    const fm = vault.parseFrontmatter(content);
+    assert.equal(fm.title, 'Build API: v2');
+  });
+
+  it('cache invalidates on write', () => {
+    const before = vault.scanNotes();
+    vault.write('ideas', 'cache-test.md', '---\ntitle: Cache Test\ntype: idea\ntags: []\ncreated: 2026-03-27\nupdated: 2026-03-27\nstatus: draft\nsummary: ""\nrelated: []\n---\n\n# Cache Test\n');
+    const after = vault.scanNotes();
+    assert.ok(after.length > before.length);
+  });
 });

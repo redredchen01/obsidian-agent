@@ -219,6 +219,12 @@ async function main() {
       break;
     }
 
+    case 'setup': {
+      const { setup } = await import('../src/commands/setup.mjs');
+      result = setup(positional[0]);
+      break;
+    }
+
     case 'watch': {
       const { watch } = await import('../src/commands/watch.mjs');
       result = watch(resolveVault(flags));
@@ -300,6 +306,7 @@ Commands:
   patch <note>             Edit a section by heading
   tag list                 List all tags with counts
   tag rename <old> <new>   Rename a tag across the vault
+  setup [vault-path]       Install MCP server + /obsidian skill for Claude Code
   watch                    Auto-rebuild indices on file changes
   health                   Vault health scoring report
   serve                    Start MCP server (stdio transport)

@@ -1,6 +1,6 @@
 {
   "name": "obsidian-agent",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "CLI toolkit for AI agents to manage Obsidian vaults — journal, notes, search, index sync, and more",
   "type": "module",
   "bin": {
@@ -12,12 +12,14 @@
   "files": [
     "bin/",
     "src/",
-    "scaffold/"
+    "scaffold/",
+    "skill/"
   ],
   "keywords": [
     "obsidian",
     "ai-agent",
     "claude-code",
+    "mcp",
     "knowledge-base",
     "cli",
     "automation",

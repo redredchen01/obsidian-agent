@@ -10,9 +10,7 @@ export function read(vaultRoot, noteName, { section } = {}) {
     throw new Error('Usage: obsidian-agent read <note-name> [--section HEADING]');
   }
 
-  // Find the note
-  const notes = vault.scanNotes();
-  const note = notes.find(n => n.file === noteName);
+  const note = vault.findNote(noteName);
   if (!note) {
     throw new Error(`Note not found: ${noteName}`);
   }

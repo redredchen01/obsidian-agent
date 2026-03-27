@@ -13,8 +13,7 @@ export function archive(vaultRoot, noteName) {
     throw new Error('Usage: obsidian-agent archive <note-name>');
   }
 
-  const notes = vault.scanNotes();
-  const note = notes.find(n => n.file === noteName);
+  const note = vault.findNote(noteName);
   if (!note) {
     throw new Error(`Note not found: ${noteName}`);
   }

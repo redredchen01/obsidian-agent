@@ -11,9 +11,7 @@ export function patch(vaultRoot, noteName, { heading, append, prepend, replace }
     throw new Error('Usage: obsidian-agent patch <note> --heading "Section" [--append|--prepend|--replace TEXT]');
   }
 
-  // Find the note
-  const notes = vault.scanNotes();
-  const note = notes.find(n => n.file === noteName);
+  const note = vault.findNote(noteName);
   if (!note) {
     throw new Error(`Note not found: ${noteName}`);
   }

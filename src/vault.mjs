@@ -51,10 +51,13 @@ export class Vault {
     const fm = match[1];
     const result = {};
     for (const line of fm.split('\n')) {
-      const m = line.match(/^(\w[\w-]*):\s*(.+)$/);
+      // Match key: value, allowing colons in value portion
+      const m = line.match(/^(\w[\w-]*):\s*(.*)$/);
       if (!m) continue;
       let [, key, val] = m;
-      val = val.trim().replace(/^"(.*)"$/, '$1');
+      val = val.trim();
+      if (!val) continue;
+      val = val.replace(/^"(.*)"$/, '$1');
       if (val.startsWith('[') && val.endsWith(']')) {
         val = val.slice(1, -1).split(',').map(s =>
           s.trim().replace(/^"(.*)"$/, '$1').replace(/^\[\[(.*)\]\]$/, '$1')
@@ -106,18 +109,28 @@ export class Vault {
     return notes;
   }
 
-  // ── Search notes by keyword (full-text) ────────────
+  // ── Search notes by keyword (relevance-scored) ─────
 
   search(keyword, { type, tag, status } = {}) {
     const notes = this.scanNotes({ includeBody: true });
     const kw = keyword.toLowerCase();
-    return notes.filter(n => {
-      if (type && n.type !== type) return false;
-      if (tag && !n.tags.includes(tag)) return false;
-      if (status && n.status !== status) return false;
-      const haystack = `${n.title} ${n.summary} ${n.tags.join(' ')} ${n.body || ''}`.toLowerCase();
-      return haystack.includes(kw);
-    }).map(({ body, ...rest }) => rest);
+    const results = [];
+    for (const n of notes) {
+      if (type && n.type !== type) continue;
+      if (tag && !n.tags.includes(tag)) continue;
+      if (status && n.status !== status) continue;
+      let score = 0;
+      if (n.title.toLowerCase().includes(kw)) score += 10;
+      if (n.file.toLowerCase().includes(kw)) score += 8;
+      if (n.tags.some(t => t.toLowerCase().includes(kw))) score += 5;
+      if (n.summary.toLowerCase().includes(kw)) score += 3;
+      if ((n.body || '').toLowerCase().includes(kw)) score += 1;
+      if (score > 0) {
+        const { body, ...rest } = n;
+        results.push({ ...rest, _score: score });
+      }
+    }
+    return results.sort((a, b) => b._score - a._score).map(({ _score, ...rest }) => rest);
   }
 
   // ── Find backlinks (notes that link TO a given note) ─
@@ -203,6 +216,32 @@ export class Vault {
       .filter(n => n.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
+  }
+
+  // ── Find note by name (fuzzy) ───────────────────────
+
+  findNote(name) {
+    if (!name) return null;
+    const notes = this.scanNotes();
+    // Exact match
+    const exact = notes.find(n => n.file === name);
+    if (exact) return exact;
+    // Case-insensitive match
+    const lower = name.toLowerCase();
+    const ci = notes.find(n => n.file.toLowerCase() === lower);
+    if (ci) return ci;
+    // Partial match (contains)
+    const partial = notes.filter(n => n.file.toLowerCase().includes(lower));
+    if (partial.length === 1) return partial[0];
+    // Title match
+    const titleMatch = notes.filter(n => n.title.toLowerCase().includes(lower));
+    if (titleMatch.length === 1) return titleMatch[0];
+    // Multiple matches — return closest (shortest file name containing the query)
+    const allMatches = [...new Set([...partial, ...titleMatch])];
+    if (allMatches.length > 0) {
+      return allMatches.sort((a, b) => a.file.length - b.file.length)[0];
+    }
+    return null;
   }
 
   // ── Type → directory mapping ─────────────────────────

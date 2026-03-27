@@ -22,9 +22,15 @@ npm install -g obsidian-agent
 ## Quick Start
 
 ```bash
+# Install
+npm install -g obsidian-agent
+
 # Initialize a new vault
 obsidian-agent init ~/my-vault
 cd ~/my-vault
+
+# Setup Claude Code integration (MCP server + /obsidian skill)
+obsidian-agent setup ~/my-vault
 
 # Create today's journal
 obsidian-agent journal
@@ -161,6 +167,7 @@ related: ["[[other-note]]", "[[another-note]]"]
 | `tag rename <old> <new>` | Rename a tag across the vault |
 | `patch <note>` | Edit a section by heading (`--heading`, `--append/--prepend/--replace`) |
 | `health` | Vault health scoring (completeness, connectivity, freshness, organization) |
+| `setup [vault-path]` | Install MCP server + `/obsidian` skill for Claude Code |
 | `watch` | Auto-rebuild indices on file changes |
 | `serve` | Start MCP server (stdio transport) |
 | `hook <event>` | Handle agent hook events |
@@ -204,6 +211,17 @@ obsidian-agent patch "my-project" --heading "Notes" --replace "Updated notes her
 # Read a section
 obsidian-agent patch "my-project" --heading "TODO"
 ```
+
+## Claude Code Setup (One Command)
+
+```bash
+obsidian-agent setup ~/my-vault
+```
+
+This automatically:
+1. Installs the `/obsidian` skill to `~/.claude/skills/obsidian/`
+2. Registers the MCP server in `~/.claude/.mcp.json`
+3. After restart, type `/obsidian` in any Claude Code session to manage your vault
 
 ## MCP Server
 

@@ -214,9 +214,20 @@ const TOOLS = [
 export class McpServer {
   constructor(vaultRoot) {
     this.vaultRoot = vaultRoot;
+    this._vault = null;
+  }
+
+  get vault() {
+    if (!this._vault) {
+      this._vault = new Vault(this.vaultRoot);
+    }
+    return this._vault;
   }
 
   async handleToolCall(name, args) {
+    // Invalidate cache before each call to pick up external changes
+    this.vault.invalidateCache();
+
     // Suppress console.log during tool execution
     const origLog = console.log;
     const origError = console.error;

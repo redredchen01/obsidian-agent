@@ -10,8 +10,8 @@ export class IndexManager {
 
   // ── Rebuild _tags.md ─────────────────────────────────
 
-  rebuildTags() {
-    const notes = this.vault.scanNotes();
+  rebuildTags(notes) {
+    if (!notes) notes = this.vault.scanNotes();
     const tagMap = {};
     for (const note of notes) {
       for (const tag of note.tags) {
@@ -39,8 +39,8 @@ export class IndexManager {
 
   // ── Rebuild _graph.md ────────────────────────────────
 
-  rebuildGraph() {
-    const notes = this.vault.scanNotes();
+  rebuildGraph(notes) {
+    if (!notes) notes = this.vault.scanNotes();
     const today = todayStr();
     let content = `---\ntitle: Knowledge Graph\ntype: index\nupdated: ${today}\n---\n\n# Knowledge Graph\n\n| Source | Links To | Relation |\n|--------|----------|----------|\n`;
 
@@ -75,11 +75,12 @@ export class IndexManager {
     this.vault.write(indexPath, content);
   }
 
-  // ── Sync all indices ─────────────────────────────────
+  // ── Sync all indices (single scan) ──────────────────
 
   sync() {
-    const tags = this.rebuildTags();
-    const graph = this.rebuildGraph();
+    const notes = this.vault.scanNotes();
+    const tags = this.rebuildTags(notes);
+    const graph = this.rebuildGraph(notes);
     return { ...tags, ...graph };
   }
 }

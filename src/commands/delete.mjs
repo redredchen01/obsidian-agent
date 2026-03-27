@@ -14,13 +14,13 @@ export function deleteNote(vaultRoot, noteName) {
     throw new Error('Usage: obsidian-agent delete <note-name>');
   }
 
-  const notes = vault.scanNotes();
-  const note = notes.find(n => n.file === noteName);
+  const note = vault.findNote(noteName);
   if (!note) {
     throw new Error(`Note not found: ${noteName}`);
   }
 
   const filePath = vault.path(note.dir, `${note.file}.md`);
+  const notes = vault.scanNotes();
 
   // Clean up references in other notes
   let cleaned = 0;
