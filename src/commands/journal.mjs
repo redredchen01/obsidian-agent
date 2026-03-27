@@ -28,8 +28,7 @@ export function journal(vaultRoot, { date } = {}) {
 
   vault.write('journal', `${d}.md`, content);
   idx.updateDirIndex('journal', d, 'Daily journal');
-  idx.rebuildTags();
-  idx.rebuildGraph();
+  idx.sync();
 
   console.log(`Created journal/${d}.md`);
   return { status: 'created', date: d };

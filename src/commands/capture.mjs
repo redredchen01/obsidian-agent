@@ -35,8 +35,7 @@ export function capture(vaultRoot, ideaText) {
 
   vault.write('ideas', `${filename}.md`, content);
   idx.updateDirIndex('ideas', filename, title);
-  idx.rebuildTags();
-  idx.rebuildGraph();
+  idx.sync();
 
   console.log(`Captured: ideas/${filename}.md`);
   return { status: 'created', file: `ideas/${filename}.md` };

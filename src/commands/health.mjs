@@ -83,7 +83,8 @@ export function health(vaultRoot) {
   console.log(`Freshness:      ${bar(freshness)}`);
   console.log(`Organization:   ${bar(organization)}`);
 
-  console.log(`\nStats: ${notes.length} notes, ${totalLinks} links, ${vault.orphans().length} orphans`);
+  const orphanNotes = nonJournal.filter(n => !linked.has(n.file) && n.related.length === 0);
+  console.log(`\nStats: ${notes.length} notes, ${totalLinks} links, ${orphanNotes.length} orphans`);
 
   if (staleNotes.length) {
     console.log(`\nStale notes (60+ days): ${staleNotes.slice(0, 10).join(', ')}${staleNotes.length > 10 ? ` (+${staleNotes.length - 10} more)` : ''}`);

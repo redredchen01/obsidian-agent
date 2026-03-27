@@ -187,6 +187,42 @@ related: ["[[other-note]]", "[[another-note]]"]
 | `--summary <text>` | Set note summary (for update) |
 | `--tags <a,b,c>` | Set tags (for note/update) |
 
+## Fuzzy Note Lookup
+
+Commands that take a note name support fuzzy matching — no need to type the exact filename:
+
+```bash
+# Exact
+obsidian-agent read build-api
+
+# Case-insensitive
+obsidian-agent read Build-API
+
+# Partial match
+obsidian-agent read vector          # finds "vector-search"
+
+# Title match
+obsidian-agent read "Build API"     # finds "build-api"
+```
+
+Works with: `read`, `delete`, `update`, `archive`, `patch`, `backlinks`.
+
+## Search Relevance
+
+Search results are ranked by relevance score:
+
+| Match Location | Score |
+|---------------|-------|
+| Title | 10 |
+| Filename | 8 |
+| Tags | 5 |
+| Summary | 3 |
+| Body text | 1 |
+
+```bash
+obsidian-agent search "API"         # title matches appear first
+```
+
 ## JSON Output
 
 All commands support `--json` for machine-readable output:
@@ -238,7 +274,7 @@ Run as an [MCP](https://modelcontextprotocol.io/) server for AI assistants (Clau
 }
 ```
 
-Exposes 15 tools: journal, note, capture, search, list, backlinks, update, archive, patch, stats, orphans, graph, sync, tag_list, tag_rename.
+Exposes 19 tools: journal, note, capture, search, list, read, recent, delete, backlinks, update, archive, patch, stats, orphans, graph, health, sync, tag_list, tag_rename.
 
 ## Vault Health
 

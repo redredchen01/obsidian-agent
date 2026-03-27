@@ -132,8 +132,7 @@ export function dailyBackfill(vaultRoot, { date, scanRoot, force } = {}) {
     ? `${commits.length} commits across ${new Set(commits.map(c => c.repo)).size} repos`
     : 'No git activity';
   idx.updateDirIndex('journal', d, summary);
-  idx.rebuildTags();
-  idx.rebuildGraph();
+  idx.sync();
 
   console.log(JSON.stringify({ status: 'created', date: d, commits: commits.length }));
 }

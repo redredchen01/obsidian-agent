@@ -18,6 +18,17 @@
 const args = process.argv.slice(2);
 const command = args[0];
 
+function levenshtein(a, b) {
+  if (!a || !b) return Math.max((a || '').length, (b || '').length);
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = Math.min(dp[i-1][j] + 1, dp[i][j-1] + 1, dp[i-1][j-1] + (a[i-1] !== b[j-1] ? 1 : 0));
+  return dp[m][n];
+}
+
 // Parse flags (supports --flag value and --flag=value)
 function parseFlags(args) {
   const flags = {};
@@ -349,10 +360,14 @@ Examples:
       break;
     }
 
-    default:
+    default: {
+      const cmds = ['init','journal','note','capture','search','list','review','sync','read','delete','recent','backlinks','update','archive','stats','graph','orphans','patch','tag','watch','health','setup','serve','hook','version','help'];
+      const similar = cmds.filter(c => c.startsWith(command?.slice(0, 2) || '') || levenshtein(c, command) <= 2);
       console.error(`Unknown command: ${command}`);
-      console.error('Run "obsidian-agent help" for usage.');
+      if (similar.length) console.error(`Did you mean: ${similar.join(', ')}?`);
+      else console.error('Run "obsidian-agent help" for usage.');
       process.exit(1);
+    }
   }
 
   // JSON output mode

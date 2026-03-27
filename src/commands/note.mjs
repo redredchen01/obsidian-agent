@@ -55,8 +55,7 @@ export function note(vaultRoot, title, type, { tags = [], goal = '', summary = '
 
   vault.write(dir, `${filename}.md`, content);
   idx.updateDirIndex(dir, filename, summary || title);
-  idx.rebuildTags();
-  idx.rebuildGraph();
+  idx.sync();
 
   // Update reverse links on related notes
   for (const rel of related) {
