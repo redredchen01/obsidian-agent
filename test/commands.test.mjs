@@ -1,9 +1,11 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, rmSync, existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const TMP = join(import.meta.dirname, '..', 'tmp', 'test-commands');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const TMP = join(__dirname, '..', 'tmp', 'test-commands');
 
 describe('commands (import)', () => {
   before(() => {

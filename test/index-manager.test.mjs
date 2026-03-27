@@ -1,11 +1,13 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { Vault } from '../src/vault.mjs';
 import { IndexManager } from '../src/index-manager.mjs';
 
-const TMP = join(import.meta.dirname, '..', 'tmp', 'test-index');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const TMP = join(__dirname, '..', 'tmp', 'test-index');
 
 describe('IndexManager', () => {
   let vault, idx;

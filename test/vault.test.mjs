@@ -1,10 +1,12 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { Vault } from '../src/vault.mjs';
 
-const TMP = join(import.meta.dirname, '..', 'tmp', 'test-vault');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const TMP = join(__dirname, '..', 'tmp', 'test-vault');
 
 describe('Vault', () => {
   let vault;
