@@ -77,6 +77,30 @@ obsidian-agent tag rename "old-tag" "new-tag"
 
 # Rebuild indices
 obsidian-agent sync
+
+# Find stale notes (30+ days without update)
+obsidian-agent stale
+obsidian-agent stale --threshold 60
+
+# Discover topic clusters and suggest missing links
+obsidian-agent cluster
+obsidian-agent cluster --auto-link --min-size 3
+
+# Project status digest
+obsidian-agent digest "build-api"
+obsidian-agent digest --all --days 14
+
+# Trace how a topic evolved over time
+obsidian-agent thread "build-api"
+obsidian-agent thread "backend" --days 30
+
+# Get daily action suggestions
+obsidian-agent suggest
+obsidian-agent suggest --days 14
+
+# Assemble full context around a note
+obsidian-agent context "build-api"
+obsidian-agent context "build-api" --days 60 --output file
 ```
 
 ## Vault Structure
@@ -167,6 +191,12 @@ related: ["[[other-note]]", "[[another-note]]"]
 | `tag rename <old> <new>` | Rename a tag across the vault |
 | `patch <note>` | Edit a section by heading (`--heading`, `--append/--prepend/--replace`) |
 | `health` | Vault health scoring (completeness, connectivity, freshness, organization) |
+| `stale` | Find stale notes and generate a prioritized triage plan |
+| `cluster` | Discover topic clusters via tag co-occurrence, suggest missing links |
+| `digest [project]` | Generate project status digest with momentum scoring |
+| `thread <topic>` | Trace how a topic evolved over time (chronological timeline) |
+| `suggest` | Intelligent daily action suggestions based on momentum and staleness |
+| `context <note>` | Assemble full context around a note (backlinks, clusters, journals) |
 | `setup [vault-path]` | Install MCP server + `/obsidian` skill for Claude Code |
 | `watch` | Auto-rebuild indices on file changes |
 | `serve` | Start MCP server (stdio transport) |
@@ -186,6 +216,12 @@ related: ["[[other-note]]", "[[another-note]]"]
 | `--month <MM>` | Month for monthly review (1-12) |
 | `--summary <text>` | Set note summary (for update) |
 | `--tags <a,b,c>` | Set tags (for note/update) |
+| `--threshold <days>` | Days without update to consider stale (default: 30, for stale) |
+| `--auto-link` | Automatically add suggested related links (for cluster) |
+| `--min-size <n>` | Minimum cluster size to report (default: 2, for cluster) |
+| `--all` | Generate digest for all active projects (for digest) |
+| `--days <n>` | Lookback period in days (for digest/thread/suggest/context) |
+| `--output file` | Write context document to vault (for context) |
 
 ## Fuzzy Note Lookup
 
@@ -205,7 +241,7 @@ obsidian-agent read vector          # finds "vector-search"
 obsidian-agent read "Build API"     # finds "build-api"
 ```
 
-Works with: `read`, `delete`, `update`, `archive`, `patch`, `backlinks`.
+Works with: `read`, `delete`, `update`, `archive`, `patch`, `backlinks`, `thread`, `context`, `digest`.
 
 ## Search Relevance
 
@@ -274,7 +310,7 @@ Run as an [MCP](https://modelcontextprotocol.io/) server for AI assistants (Clau
 }
 ```
 
-Exposes 19 tools: journal, note, capture, search, list, read, recent, delete, backlinks, update, archive, patch, stats, orphans, graph, health, sync, tag_list, tag_rename.
+Exposes 25 tools: journal, note, capture, search, list, read, recent, delete, backlinks, update, archive, patch, stats, orphans, graph, health, sync, tag_list, tag_rename, stale, cluster, digest, thread, suggest, context.
 
 ## Vault Health
 
