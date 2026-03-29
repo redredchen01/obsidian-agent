@@ -2,6 +2,14 @@
  * Date utilities — timezone-aware helpers
  */
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isValidDate(dateStr) {
+  if (!dateStr || !DATE_RE.test(dateStr)) return false;
+  const d = new Date(dateStr + 'T12:00:00Z');
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === dateStr;
+}
+
 export function todayStr(tz = process.env.OA_TIMEZONE || 'UTC') {
   return new Date().toLocaleDateString('sv-SE', { timeZone: tz });
 }

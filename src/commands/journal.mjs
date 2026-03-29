@@ -4,9 +4,12 @@
 import { Vault } from '../vault.mjs';
 import { TemplateEngine } from '../templates.mjs';
 import { IndexManager } from '../index-manager.mjs';
-import { todayStr, weekdayShort, prevDate, nextDate } from '../dates.mjs';
+import { todayStr, weekdayShort, prevDate, nextDate, isValidDate } from '../dates.mjs';
 
 export function journal(vaultRoot, { date } = {}) {
+  if (date && !isValidDate(date)) {
+    throw new Error(`Invalid date format: "${date}". Expected YYYY-MM-DD.`);
+  }
   const vault = new Vault(vaultRoot);
   const tpl = new TemplateEngine(vaultRoot);
   const idx = new IndexManager(vault);

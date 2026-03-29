@@ -4,13 +4,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
 import { resolve, join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { homedir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILL_SRC = resolve(__dirname, '..', '..', 'skill', 'SKILL.md');
 
 export function setup(vaultPath) {
   const vault = resolve(vaultPath || process.env.OA_VAULT || '.');
-  const home = process.env.HOME || process.env.USERPROFILE;
+  const home = homedir();
   const results = [];
 
   // 1. Verify vault exists

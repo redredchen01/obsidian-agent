@@ -2,7 +2,7 @@
  * Vault — core operations for reading/writing Obsidian notes
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'fs';
-import { resolve, join } from 'path';
+import { resolve, join, dirname } from 'path';
 
 export class Vault {
   constructor(root) {
@@ -31,15 +31,16 @@ export class Vault {
 
   read(...segments) {
     const p = this.path(...segments);
-    return existsSync(p) ? readFileSync(p, 'utf8') : null;
+    return existsSync(p) ? readFileSync(p, 'utf8').replace(/\r\n/g, '\n') : null;
   }
 
   write(...args) {
     const content = args.pop();
     const p = this.path(...args);
-    const dir = p.substring(0, p.lastIndexOf('/'));
+    const dir = dirname(p);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(p, content);
+    // Normalize to LF for consistent cross-platform storage
+    writeFileSync(p, content.replace(/\r\n/g, '\n'));
     this.invalidateCache();
   }
 
@@ -139,8 +140,8 @@ export class Vault {
     const notes = this.scanNotes({ includeBody: true });
     return notes.filter(n => {
       if (n.file === noteName) return false;
-      const content = `${n.related.join(' ')} ${n.body || ''}`;
-      return content.includes(`[[${noteName}]]`);
+      if (n.related.includes(noteName)) return true;
+      return (n.body || '').includes(`[[${noteName}]]`);
     }).map(({ body, ...rest }) => rest);
   }
 

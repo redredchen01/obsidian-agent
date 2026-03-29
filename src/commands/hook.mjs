@@ -1,17 +1,37 @@
 /**
  * hook — event handlers for agent hooks (session-stop, daily-backfill, weekly-review)
  */
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { execSync } from 'child_process';
-import { dirname } from 'path';
+import { dirname, join, basename } from 'path';
 import { Vault } from '../vault.mjs';
 import { TemplateEngine } from '../templates.mjs';
 import { IndexManager } from '../index-manager.mjs';
-import { todayStr, weekdayShort, prevDate, nextDate } from '../dates.mjs';
+import { todayStr, weekdayShort, prevDate, nextDate, isValidDate } from '../dates.mjs';
 
 function run(cmd) {
   try { return execSync(cmd, { encoding: 'utf8', timeout: 30000 }).trim(); }
-  catch { return ''; }
+  catch (err) { return ''; }
+}
+
+// ── Find .git directories recursively (cross-platform) ──
+
+function findGitDirs(root, maxDepth = 5, depth = 0) {
+  if (depth > maxDepth) return [];
+  const dirs = [];
+  let entries;
+  try { entries = readdirSync(root, { withFileTypes: true }); }
+  catch { return []; }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const full = join(root, entry.name);
+    if (entry.name === '.git') {
+      dirs.push(full);
+    } else if (entry.name !== 'node_modules' && entry.name !== '.obsidian') {
+      dirs.push(...findGitDirs(full, maxDepth, depth + 1));
+    }
+  }
+  return dirs;
 }
 
 // ── Collect git commits for a date across all repos in a directory ──
@@ -19,14 +39,14 @@ function run(cmd) {
 function getGitCommits(scanRoot, date) {
   const since = `${date}T00:00:00`;
   const until = `${nextDate(date)}T00:00:00`;
-  const gitDirs = run(`find "${scanRoot}" -maxdepth 5 -name ".git" -type d 2>/dev/null`);
-  if (!gitDirs) return [];
+  const gitDirs = findGitDirs(scanRoot);
+  if (!gitDirs.length) return [];
 
   const commits = [];
-  for (const gitDir of gitDirs.split('\n').filter(Boolean)) {
+  for (const gitDir of gitDirs) {
     const repo = dirname(gitDir);
-    const repoName = repo.split('/').pop();
-    const log = run(`git -C "${repo}" log --oneline --since="${since}" --until="${until}" --all 2>/dev/null`);
+    const repoName = basename(repo);
+    const log = run(`git -C "${repo}" log --oneline --since="${since}" --until="${until}" --all`);
     if (log) {
       for (const line of log.split('\n').filter(Boolean)) {
         commits.push({ repo: repoName, message: line.replace(/^[a-f0-9]+ /, '') });
@@ -44,11 +64,11 @@ export function sessionStop(vaultRoot, { scanRoot } = {}) {
   const idx = new IndexManager(vault);
   const date = todayStr();
 
-  // Read stdin (agent hook payload)
+  // Read stdin (agent hook payload) — use fd 0 for cross-platform support
   let stdin = '';
-  try { stdin = readFileSync('/dev/stdin', 'utf8'); } catch {}
+  try { stdin = readFileSync(0, 'utf8'); } catch (err) { /* no stdin data */ }
   let hookData = {};
-  try { hookData = JSON.parse(stdin); } catch {}
+  try { hookData = JSON.parse(stdin); } catch (err) { /* non-JSON or empty stdin */ }
 
   const reason = hookData.stop_reason;
   if (!reason || reason === 'unknown') {
@@ -88,6 +108,9 @@ export function sessionStop(vaultRoot, { scanRoot } = {}) {
 // ── daily-backfill: create journal from git history ──
 
 export function dailyBackfill(vaultRoot, { date, scanRoot, force } = {}) {
+  if (date && !isValidDate(date)) {
+    throw new Error(`Invalid date format: "${date}". Expected YYYY-MM-DD.`);
+  }
   const vault = new Vault(vaultRoot);
   const tpl = new TemplateEngine(vaultRoot);
   const idx = new IndexManager(vault);

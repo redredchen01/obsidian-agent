@@ -52,7 +52,8 @@ related: []
   });
 
   it('path resolves correctly', () => {
-    assert.ok(vault.path('projects', 'build-api.md').endsWith('projects/build-api.md'));
+    const p = vault.path('projects', 'build-api.md');
+    assert.ok(p.endsWith(join('projects', 'build-api.md')));
   });
 
   it('exists checks files', () => {
