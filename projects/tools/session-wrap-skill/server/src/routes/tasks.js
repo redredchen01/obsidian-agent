@@ -1,10 +1,80 @@
 const { Router } = require('express');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const { readTasks, taskExists, deleteTask } = require('../parsers/tasks');
 const { AGENT_TASKS_PATH } = require('../config');
 const fs = require('fs');
 
 const router = Router();
+const TASK_ID_PATTERN = /^[a-z0-9-]+$/;
+
+function isValidTaskId(value) {
+  return typeof value === 'string' && TASK_ID_PATTERN.test(value);
+}
+
+function normalizeCreatePayload(body = {}) {
+  const { id, description, depends_on, assigned_to } = body;
+
+  if (!id || !description) {
+    return { error: 'id and description are required', status: 400 };
+  }
+
+  if (!isValidTaskId(id)) {
+    return { error: 'id must be lowercase alphanumeric with hyphens', status: 400 };
+  }
+
+  if (typeof description !== 'string' || !description.trim()) {
+    return { error: 'description must be a non-empty string', status: 400 };
+  }
+
+  if (depends_on !== undefined) {
+    if (!Array.isArray(depends_on) || depends_on.some(dep => !isValidTaskId(dep))) {
+      return { error: 'depends_on must be an array of task ids', status: 400 };
+    }
+  }
+
+  if (assigned_to !== undefined && assigned_to !== null) {
+    if (typeof assigned_to !== 'string' || !assigned_to.trim()) {
+      return { error: 'assigned_to must be a non-empty string', status: 400 };
+    }
+  }
+
+  return {
+    value: {
+      id,
+      description: description.trim(),
+      depends_on: depends_on || [],
+      assigned_to: assigned_to?.trim() || null,
+    }
+  };
+}
+
+function normalizePatchPayload(body = {}) {
+  const { status, assigned_to } = body;
+
+  if (status !== undefined && status !== 'completed') {
+    return { error: 'status can only be set to completed', status: 400 };
+  }
+
+  if (assigned_to !== undefined && assigned_to !== null) {
+    if (typeof assigned_to !== 'string' || !assigned_to.trim()) {
+      return { error: 'assigned_to must be a non-empty string', status: 400 };
+    }
+  }
+
+  return {
+    value: {
+      status,
+      assigned_to: assigned_to === undefined ? undefined : (assigned_to?.trim() || null),
+    }
+  };
+}
+
+function runAgentTasks(command, ...args) {
+  execFileSync('bash', [AGENT_TASKS_PATH, command, ...args], {
+    timeout: 5000,
+    stdio: 'pipe',
+  });
+}
 
 router.get('/tasks', (req, res) => {
   try {
@@ -17,15 +87,11 @@ router.get('/tasks', (req, res) => {
 
 router.post('/tasks', (req, res) => {
   try {
-    const { id, description, depends_on, assigned_to } = req.body;
-
-    if (!id || !description) {
-      return res.status(400).json({ error: 'id and description are required' });
+    const parsed = normalizeCreatePayload(req.body);
+    if (parsed.error) {
+      return res.status(parsed.status).json({ error: parsed.error });
     }
-
-    if (!/^[a-z0-9-]+$/.test(id)) {
-      return res.status(400).json({ error: 'id must be lowercase alphanumeric with hyphens' });
-    }
+    const { id, description, depends_on, assigned_to } = parsed.value;
 
     if (taskExists(id)) {
       return res.status(409).json({ error: `Task '${id}' already exists` });
@@ -35,13 +101,10 @@ router.post('/tasks', (req, res) => {
       return res.status(500).json({ error: 'agent-tasks.sh not found. Run setup first.' });
     }
 
-    const deps = (depends_on || []).join(' ');
-    const cmd = `bash "${AGENT_TASKS_PATH}" add "${id}" "${description}" ${deps}`.trim();
-    execSync(cmd, { timeout: 5000, stdio: 'pipe' });
+    runAgentTasks('add', id, description, ...depends_on);
 
     if (assigned_to) {
-      const claimCmd = `bash "${AGENT_TASKS_PATH}" claim "${id}" "${assigned_to}"`;
-      execSync(claimCmd, { timeout: 5000, stdio: 'pipe' });
+      runAgentTasks('claim', id, assigned_to);
     }
 
     const tasks = readTasks();
@@ -55,7 +118,11 @@ router.post('/tasks', (req, res) => {
 router.patch('/tasks/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { status, assigned_to } = req.body;
+    const parsed = normalizePatchPayload(req.body);
+    if (parsed.error) {
+      return res.status(parsed.status).json({ error: parsed.error });
+    }
+    const { status, assigned_to } = parsed.value;
 
     if (!taskExists(id)) {
       return res.status(404).json({ error: `Task '${id}' not found` });
@@ -66,14 +133,12 @@ router.patch('/tasks/:id', (req, res) => {
     }
 
     if (status === 'completed') {
-      const cmd = `bash "${AGENT_TASKS_PATH}" done "${id}"`;
-      execSync(cmd, { timeout: 5000, stdio: 'pipe' });
+      runAgentTasks('done', id);
     }
 
     if (assigned_to !== undefined) {
       const agent = assigned_to || 'unknown';
-      const cmd = `bash "${AGENT_TASKS_PATH}" claim "${id}" "${agent}"`;
-      execSync(cmd, { timeout: 5000, stdio: 'pipe' });
+      runAgentTasks('claim', id, agent);
     }
 
     const tasks = readTasks();
@@ -98,3 +163,6 @@ router.delete('/tasks/:id', (req, res) => {
 });
 
 module.exports = router;
+module.exports.isValidTaskId = isValidTaskId;
+module.exports.normalizeCreatePayload = normalizeCreatePayload;
+module.exports.normalizePatchPayload = normalizePatchPayload;

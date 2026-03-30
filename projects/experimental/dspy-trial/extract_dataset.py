@@ -10,24 +10,19 @@ from pathlib import Path
 VAULT_DIR = Path(os.path.expanduser("~/YD 2026/obsidian"))
 OUTPUT_FILE = Path(__file__).parent / "dataset.json"
 
-# Skip index/template files
 SKIP_PATTERNS = {"_index.md", "_tags.md", "_graph.md", "_graph_visual.md", "CONVENTIONS.md", "CLAUDE.md"}
 SKIP_DIRS = {"templates", ".claude", ".obsidian"}
 
 
 def parse_frontmatter(content: str) -> dict | None:
-    """Extract YAML frontmatter from markdown content."""
     match = re.match(r"^---\n(.*?)\n---\n", content, re.DOTALL)
     if not match:
         return None
-
     fm = {}
     for line in match.group(1).split("\n"):
         if ":" in line:
             key, val = line.split(":", 1)
-            key = key.strip()
-            val = val.strip()
-            # Parse YAML list: [tag1, tag2]
+            key, val = key.strip(), val.strip()
             if val.startswith("[") and val.endswith("]"):
                 items = [s.strip().strip('"').strip("'") for s in val[1:-1].split(",")]
                 fm[key] = [i for i in items if i]
@@ -37,50 +32,36 @@ def parse_frontmatter(content: str) -> dict | None:
 
 
 def extract_body(content: str, max_chars: int = 1500) -> str:
-    """Extract body text after frontmatter, truncated."""
     match = re.match(r"^---\n.*?\n---\n", content, re.DOTALL)
     body = content[match.end():] if match else content
-    # Remove markdown headers for cleaner input
     body = re.sub(r"^#+\s+", "", body, flags=re.MULTILINE)
-    # Collapse whitespace
     body = re.sub(r"\n{3,}", "\n\n", body).strip()
     return body[:max_chars]
 
 
 def collect_notes() -> list[dict]:
-    """Walk vault and collect all notes with frontmatter tags."""
     notes = []
     for md_file in VAULT_DIR.rglob("*.md"):
-        # Skip excluded files/dirs
         if md_file.name in SKIP_PATTERNS:
             continue
         if any(d in md_file.parts for d in SKIP_DIRS):
             continue
-
         content = md_file.read_text(encoding="utf-8")
         fm = parse_frontmatter(content)
         if not fm or "tags" not in fm or not fm["tags"]:
             continue
-
-        title = fm.get("title", md_file.stem)
-        summary = fm.get("summary", "")
-        note_type = fm.get("type", "")
-        body = extract_body(content)
-
         notes.append({
             "file": str(md_file.relative_to(VAULT_DIR)),
-            "title": title,
-            "type": note_type,
-            "summary": summary,
-            "content": body,
+            "title": fm.get("title", md_file.stem),
+            "type": fm.get("type", ""),
+            "summary": fm.get("summary", ""),
+            "content": extract_body(content),
             "tags": fm["tags"],
         })
-
     return notes
 
 
-def split_dataset(notes: list[dict], train_ratio: float = 0.7, seed: int = 42):
-    """Split into train/test sets."""
+def split_dataset(notes, train_ratio=0.7, seed=42):
     random.seed(seed)
     shuffled = notes.copy()
     random.shuffle(shuffled)
@@ -91,8 +72,6 @@ def split_dataset(notes: list[dict], train_ratio: float = 0.7, seed: int = 42):
 def main():
     notes = collect_notes()
     train, test = split_dataset(notes)
-
-    # Collect all unique tags
     all_tags = sorted(set(t for n in notes for t in n["tags"]))
 
     dataset = {
@@ -104,7 +83,6 @@ def main():
         "train": train,
         "test": test,
     }
-
     OUTPUT_FILE.write_text(json.dumps(dataset, ensure_ascii=False, indent=2))
     print(f"Extracted {len(notes)} notes with tags")
     print(f"  Train: {len(train)}, Test: {len(test)}")

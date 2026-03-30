@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/database');
 const { verifyClaudeToken } = require('../middleware/auth');
+const { hashToken } = require('../utils/token');
 
 const router = express.Router();
 
@@ -40,12 +41,12 @@ router.post('/login', async (req, res) => {
          claude_token = EXCLUDED.claude_token,
          verified_at = CURRENT_TIMESTAMP,
          expires_at = EXCLUDED.expires_at`,
-      [user.id, claudeToken, verification.expiresAt]
+      [user.id, hashToken(claudeToken), verification.expiresAt]
     );
 
     // Generate JWT
     const jwtToken = jwt.sign(
-      { userId: user.id, login: user.github_login },
+      { id: user.id, userId: user.id, login: user.github_login },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRY || '7d' }
     );

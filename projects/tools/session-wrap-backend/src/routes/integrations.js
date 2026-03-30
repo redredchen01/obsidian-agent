@@ -6,15 +6,53 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const { pool } = require('../db/init');
-const { authenticateToken, checkRole } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
+const { getUserRoles } = require('../middleware/authorization');
 
 // Middleware: Ensure user is authenticated
 router.use(authenticateToken);
 
+async function requireWorkspaceAccess(req, res, next) {
+  try {
+    const workspaceId = req.params.workspaceId;
+    const roles = await getUserRoles(req.user.id, workspaceId);
+
+    if (!roles.some(role => ['admin', 'editor', 'viewer'].includes(role))) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    req.userRoles = roles;
+    next();
+  } catch (error) {
+    console.error('Workspace access check failed:', error);
+    res.status(500).json({ error: 'Authorization check failed' });
+  }
+}
+
+async function attachWorkspaceIdFromIntegration(req, res, next) {
+  try {
+    const { integrationId } = req.params;
+    const result = await pool.query(
+      'SELECT workspace_id FROM integrations WHERE id = $1',
+      [integrationId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Integration not found' });
+    }
+
+    req.params.workspaceId = result.rows[0].workspace_id;
+    next();
+  } catch (error) {
+    console.error('Integration lookup failed:', error);
+    res.status(500).json({ error: 'Authorization check failed' });
+  }
+}
+
 // ===== INTEGRATION MANAGEMENT ENDPOINTS =====
 
 // Get integrations for a workspace
-router.get('/integrations/:workspaceId', async (req, res) => {
+router.get('/integrations/:workspaceId', requireWorkspaceAccess, async (req, res) => {
   try {
     const { workspaceId } = req.params;
 
@@ -38,7 +76,7 @@ router.get('/integrations/:workspaceId', async (req, res) => {
 });
 
 // Setup/update integration
-router.post('/integrations/:workspaceId/setup', async (req, res) => {
+router.post('/integrations/:workspaceId/setup', requireWorkspaceAccess, async (req, res) => {
   try {
     const { workspaceId } = req.params;
     const { service_name, config } = req.body;
@@ -71,7 +109,7 @@ router.post('/integrations/:workspaceId/setup', async (req, res) => {
 });
 
 // Disable/enable integration
-router.put('/integrations/:integrationId/toggle', async (req, res) => {
+router.put('/integrations/:integrationId/toggle', attachWorkspaceIdFromIntegration, requireWorkspaceAccess, async (req, res) => {
   try {
     const { integrationId } = req.params;
 
@@ -96,7 +134,7 @@ router.put('/integrations/:integrationId/toggle', async (req, res) => {
 });
 
 // Delete integration
-router.delete('/integrations/:integrationId', async (req, res) => {
+router.delete('/integrations/:integrationId', attachWorkspaceIdFromIntegration, requireWorkspaceAccess, async (req, res) => {
   try {
     const { integrationId } = req.params;
 
@@ -115,7 +153,7 @@ router.delete('/integrations/:integrationId', async (req, res) => {
 });
 
 // Get integration events
-router.get('/integrations/:integrationId/events', async (req, res) => {
+router.get('/integrations/:integrationId/events', attachWorkspaceIdFromIntegration, requireWorkspaceAccess, async (req, res) => {
   try {
     const { integrationId } = req.params;
     const limit = req.query.limit || 50;
@@ -143,7 +181,7 @@ router.get('/integrations/:integrationId/events', async (req, res) => {
 // ===== SLACK INTEGRATION =====
 
 // Send test message to Slack
-router.post('/integrations/:workspaceId/slack/test', async (req, res) => {
+router.post('/integrations/:workspaceId/slack/test', requireWorkspaceAccess, async (req, res) => {
   try {
     const { workspaceId } = req.params;
 
@@ -175,7 +213,7 @@ router.post('/integrations/:workspaceId/slack/test', async (req, res) => {
 // ===== GITHUB INTEGRATION =====
 
 // Test GitHub connection
-router.post('/integrations/:workspaceId/github/test', async (req, res) => {
+router.post('/integrations/:workspaceId/github/test', requireWorkspaceAccess, async (req, res) => {
   try {
     const { workspaceId } = req.params;
     const config = await getIntegrationConfig(workspaceId, 'github');
@@ -205,7 +243,7 @@ router.post('/integrations/:workspaceId/github/test', async (req, res) => {
 // ===== JIRA INTEGRATION =====
 
 // Test Jira connection
-router.post('/integrations/:workspaceId/jira/test', async (req, res) => {
+router.post('/integrations/:workspaceId/jira/test', requireWorkspaceAccess, async (req, res) => {
   try {
     const { workspaceId } = req.params;
     const config = await getIntegrationConfig(workspaceId, 'jira');
@@ -298,3 +336,5 @@ function validateIntegrationConfig(serviceName, config) {
 
 // Export helper functions
 module.exports = { router, getIntegrationConfig, logIntegrationEvent };
+module.exports.requireWorkspaceAccess = requireWorkspaceAccess;
+module.exports.attachWorkspaceIdFromIntegration = attachWorkspaceIdFromIntegration;

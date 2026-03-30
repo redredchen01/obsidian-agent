@@ -47,7 +47,7 @@ const PLATFORMS = [
       fs.existsSync(path.join(process.cwd(), ".cline")) ||
       fs.existsSync(path.join(process.cwd(), ".clinerules")),
     install: (full) => {
-      const dir = path.join(process.cwd(), ".cline", "rules");
+      const dir = resolveRulesDir(".cline", ".clinerules");
       fs.mkdirSync(dir, { recursive: true });
       const dest = path.join(dir, "ctx.md");
       fs.copyFileSync(full ? SKILL_FULL_SRC : SKILL_SRC, dest);
@@ -71,7 +71,7 @@ const PLATFORMS = [
       fs.existsSync(path.join(process.cwd(), ".roo")) ||
       fs.existsSync(path.join(process.cwd(), ".roorules")),
     install: (full) => {
-      const dir = path.join(process.cwd(), ".roo", "rules");
+      const dir = resolveRulesDir(".roo", ".roorules");
       fs.mkdirSync(dir, { recursive: true });
       const dest = path.join(dir, "ctx.md");
       fs.copyFileSync(full ? SKILL_FULL_SRC : SKILL_SRC, dest);
@@ -79,6 +79,14 @@ const PLATFORMS = [
     },
   },
 ];
+
+function resolveRulesDir(primaryDir, legacyDir) {
+  const primary = path.join(process.cwd(), primaryDir);
+  const legacy = path.join(process.cwd(), legacyDir);
+
+  if (fs.existsSync(legacy)) return legacy;
+  return path.join(primary, "rules");
+}
 
 function install(args) {
   const full = args.includes("--full");
@@ -122,8 +130,10 @@ function uninstall() {
     path.join(HOME, ".claude", "skills", "ctx"),
     path.join(process.cwd(), ".cursor", "rules", "ctx.mdc"),
     path.join(process.cwd(), ".cline", "rules", "ctx.md"),
+    path.join(process.cwd(), ".clinerules", "ctx.md"),
     path.join(process.cwd(), ".kilo", "rules", "ctx.md"),
     path.join(process.cwd(), ".roo", "rules", "ctx.md"),
+    path.join(process.cwd(), ".roorules", "ctx.md"),
   ];
   let removed = 0;
   for (const p of paths) {
@@ -149,7 +159,13 @@ function status() {
     return;
   }
 
-  const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  const parsedState = readJsonFile(statePath);
+  if (!parsedState) {
+    console.log("\nState file is corrupted. Run `ctx init` to recreate it.\n");
+    return;
+  }
+
+  const state = normalizeState(parsedState);
   const pct = Math.min(100, Math.round((state.usedTokens / state.maxTokens) * 100));
   const icons = { green: "\u{1F7E2}", yellow: "\u{1F7E1}", orange: "\u{1F7E0}", red: "\u{1F534}" };
   const thresholds = [[40, "green"], [60, "yellow"], [80, "orange"], [100, "red"]];
@@ -193,21 +209,15 @@ function init() {
 
   const statePath = path.join(ctxDir, "state.json");
   if (fs.existsSync(statePath)) {
-    console.log("  \u{2705} .ctx/state.json already exists (preserved)");
+    const parsedState = readJsonFile(statePath);
+    if (parsedState) {
+      console.log("  \u{2705} .ctx/state.json already exists (preserved)");
+    } else {
+      fs.writeFileSync(statePath, JSON.stringify(createDefaultState(), null, 2));
+      console.log("  \u26A0\uFE0F  .ctx/state.json was corrupted and has been recreated");
+    }
   } else {
-    const state = {
-      maxTokens: 200000,
-      usedTokens: 0,
-      filesRead: [],
-      dupCount: 0,
-      toolCallCount: 0,
-      writeCount: 0,
-      bashCount: 0,
-      responseCount: 0,
-      checkpointedThresholds: [],
-      startedAt: new Date().toISOString(),
-    };
-    fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+    fs.writeFileSync(statePath, JSON.stringify(createDefaultState(), null, 2));
     console.log("  \u{2705} .ctx/state.json created");
   }
   console.log("  \u{1F4C1} .ctx/checkpoints/ ready");
@@ -237,13 +247,22 @@ function hookInstall() {
   const settingsPath = path.join(HOME, ".claude", "settings.json");
   let settings = {};
   if (fs.existsSync(settingsPath)) {
-    settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    const parsedSettings = readJsonFile(settingsPath);
+    if (parsedSettings && typeof parsedSettings === "object" && !Array.isArray(parsedSettings)) {
+      settings = parsedSettings;
+    } else {
+      console.log("  \u26A0\uFE0F  settings.json is corrupted; recreating Claude settings");
+    }
   } else {
     fs.mkdirSync(path.join(HOME, ".claude"), { recursive: true });
   }
 
   const hooks = settings.hooks = settings.hooks || {};
-  const afterTool = hooks.afterToolUse = hooks.afterToolUse || [];
+  const afterTool = Array.isArray(hooks.afterToolUse) ? hooks.afterToolUse : [];
+  if (hooks.afterToolUse && !Array.isArray(hooks.afterToolUse)) {
+    console.log("  \u26A0\uFE0F  afterToolUse was not an array; replacing it with a normalized hook list");
+  }
+  hooks.afterToolUse = afterTool;
 
   const hookCmd = `bash ${hookSrc}`;
   const existing = afterTool.find((e) =>
@@ -282,28 +301,36 @@ function reset() {
 
   if (fs.existsSync(statePath)) {
     // Archive current session to history
-    const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
-    const session = {
-      startedAt: state.startedAt,
-      endedAt: new Date().toISOString(),
-      usedTokens: state.usedTokens,
-      maxTokens: state.maxTokens,
-      filesRead: (state.filesRead || []).length,
-      dupCount: state.dupCount || 0,
-      toolCallCount: state.toolCallCount || 0,
-      writeCount: state.writeCount || 0,
-    };
+    const state = readJsonFile(statePath);
+    if (state) {
+      const session = {
+        startedAt: state.startedAt,
+        endedAt: new Date().toISOString(),
+        usedTokens: state.usedTokens,
+        maxTokens: state.maxTokens,
+        filesRead: (state.filesRead || []).length,
+        dupCount: state.dupCount || 0,
+        toolCallCount: state.toolCallCount || 0,
+        writeCount: state.writeCount || 0,
+      };
 
-    let history = [];
-    if (fs.existsSync(historyPath)) {
-      history = JSON.parse(fs.readFileSync(historyPath, "utf8"));
+      let history = [];
+      if (fs.existsSync(historyPath)) {
+        const parsedHistory = readJsonFile(historyPath);
+        if (Array.isArray(parsedHistory)) {
+          history = parsedHistory;
+        } else {
+          console.log("  \u26A0\uFE0F  history.json is corrupted; starting a new history log");
+        }
+      }
+      history.push(session);
+      if (history.length > 50) history = history.slice(-50);
+      fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
+      console.log(`  \u{1F4BE} Session archived to history (${history.length} total)`);
+      console.log(`     Used: ${Math.round(state.usedTokens / 1000)}K tokens | ${(state.filesRead || []).length} files | ${state.dupCount || 0} dups`);
+    } else {
+      console.log("  \u26A0\uFE0F  state.json is corrupted; skipping archive and creating a fresh state");
     }
-    history.push(session);
-    // Keep last 50 sessions
-    if (history.length > 50) history = history.slice(-50);
-    fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
-    console.log(`  \u{1F4BE} Session archived to history (${history.length} total)`);
-    console.log(`     Used: ${Math.round(state.usedTokens / 1000)}K tokens | ${(state.filesRead || []).length} files | ${state.dupCount || 0} dups`);
   }
 
   // Reset state
@@ -332,7 +359,12 @@ function historyCmd() {
     return;
   }
 
-  const history = JSON.parse(fs.readFileSync(historyPath, "utf8"));
+  const history = readJsonFile(historyPath);
+  if (!Array.isArray(history)) {
+    console.log("\nHistory file is corrupted. Resetting it to an empty session log.\n");
+    fs.writeFileSync(historyPath, JSON.stringify([], null, 2));
+    return;
+  }
   console.log(`\n\u{1F9E0} ctx history — ${history.length} sessions\n`);
   console.log(`  ${"Date".padEnd(12)} ${"Tokens".padStart(8)} ${"Files".padStart(6)} ${"Dups".padStart(5)} ${"Calls".padStart(6)}`);
   console.log(`  ${"─".repeat(12)} ${"─".repeat(8)} ${"─".repeat(6)} ${"─".repeat(5)} ${"─".repeat(6)}`);
@@ -349,6 +381,56 @@ function historyCmd() {
   console.log(`  Duplicates blocked: ${totalDups} (saved ~${Math.round(totalDups * 200 * 15 / 1000)}K tokens)\n`);
 }
 
+function parseNonNegativeInt(raw, defaultValue) {
+  if (raw === undefined) return { ok: true, value: defaultValue };
+
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    return { ok: false };
+  }
+
+  return { ok: true, value };
+}
+
+function readJsonFile(filePath, fallbackValue = null) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return fallbackValue;
+  }
+}
+
+function createDefaultState() {
+  return {
+    maxTokens: 200000,
+    usedTokens: 0,
+    filesRead: [],
+    dupCount: 0,
+    toolCallCount: 0,
+    writeCount: 0,
+    bashCount: 0,
+    responseCount: 0,
+    checkpointedThresholds: [],
+    startedAt: new Date().toISOString(),
+  };
+}
+
+function normalizeState(rawState) {
+  const base = createDefaultState();
+  const state = rawState && typeof rawState === "object" ? { ...base, ...rawState } : base;
+  state.maxTokens = Number.isFinite(state.maxTokens) && state.maxTokens > 0 ? state.maxTokens : base.maxTokens;
+  state.usedTokens = Number.isFinite(state.usedTokens) && state.usedTokens >= 0 ? state.usedTokens : base.usedTokens;
+  state.filesRead = Array.isArray(state.filesRead) ? state.filesRead : [];
+  state.dupCount = Number.isFinite(state.dupCount) && state.dupCount >= 0 ? state.dupCount : 0;
+  state.toolCallCount = Number.isFinite(state.toolCallCount) && state.toolCallCount >= 0 ? state.toolCallCount : 0;
+  state.writeCount = Number.isFinite(state.writeCount) && state.writeCount >= 0 ? state.writeCount : 0;
+  state.bashCount = Number.isFinite(state.bashCount) && state.bashCount >= 0 ? state.bashCount : 0;
+  state.responseCount = Number.isFinite(state.responseCount) && state.responseCount >= 0 ? state.responseCount : 0;
+  state.checkpointedThresholds = Array.isArray(state.checkpointedThresholds) ? state.checkpointedThresholds : [];
+  state.startedAt = state.startedAt || base.startedAt;
+  return state;
+}
+
 // Universal tracking — works on ANY agent that can run bash
 function track(args) {
   const statePath = path.join(process.cwd(), ".ctx", "state.json");
@@ -356,21 +438,24 @@ function track(args) {
     // Auto-init if needed
     const ctxDir = path.join(process.cwd(), ".ctx");
     fs.mkdirSync(path.join(ctxDir, "checkpoints"), { recursive: true });
-    fs.writeFileSync(statePath, JSON.stringify({
-      maxTokens: 200000, usedTokens: 0, filesRead: [], dupCount: 0,
-      toolCallCount: 0, writeCount: 0, bashCount: 0, responseCount: 0,
-      checkpointedThresholds: [], startedAt: new Date().toISOString(),
-    }, null, 2));
+    fs.writeFileSync(statePath, JSON.stringify(createDefaultState(), null, 2));
   }
 
-  const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  const state = normalizeState(readJsonFile(statePath, createDefaultState()));
   const subCmd = args[0];
 
   if (subCmd === "read") {
     // ctx track read <file> [lines]
     const file = args[1];
-    const lines = parseInt(args[2]) || 200;
     if (!file) { console.log("Usage: ctx track read <file> [lines]"); return; }
+    const parsedLines = parseNonNegativeInt(args[2], 200);
+    if (!parsedLines.ok) {
+      console.log("Usage: ctx track read <file> [lines]");
+      console.log("  lines must be a non-negative integer");
+      process.exitCode = 1;
+      return;
+    }
+    const lines = parsedLines.value;
 
     const existing = (state.filesRead || []).find((f) => f.path === file);
     if (existing) {
@@ -397,7 +482,14 @@ function track(args) {
 
   } else if (subCmd === "response") {
     // ctx track response [chars]
-    const chars = parseInt(args[1]) || 500;
+    const parsedChars = parseNonNegativeInt(args[1], 500);
+    if (!parsedChars.ok) {
+      console.log("Usage: ctx track response [chars]");
+      console.log("  chars must be a non-negative integer");
+      process.exitCode = 1;
+      return;
+    }
+    const chars = parsedChars.value;
     state.usedTokens += Math.round(chars * 0.25);
     state.responseCount = (state.responseCount || 0) + 1;
 

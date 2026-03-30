@@ -1,7 +1,10 @@
 # YD 2026 Workspace Shortcuts
 # Source this from ~/.zshrc with: source ~/YD\ 2026/.zshrc-workspace
 
-export WORKSPACE_ROOT="$HOME/YD 2026"
+export WORKSPACE_ROOT="${YD_WORKSPACE:-/Users/dex/YD 2026}"
+
+# 載入 session-wrap aliases（agent tools, viz, wrap）
+[ -f "$WORKSPACE_ROOT/.zshrc-wrap" ] && source "$WORKSPACE_ROOT/.zshrc-wrap"
 
 # 快速進入項目
 alias p1="cd '$WORKSPACE_ROOT/projects/production/gwx'"
@@ -10,9 +13,7 @@ alias p3="cd '$WORKSPACE_ROOT/projects/experimental/NS_0327'"
 alias pw="cd '$WORKSPACE_ROOT'"
 alias pj="cd '$WORKSPACE_ROOT/projects'"
 
-# 知識庫
-alias kb="code '$WORKSPACE_ROOT/obsidian'"
-alias mem="cat '$HOME/.claude/projects/-Users-dex-YD-2026/memory/MEMORY.md'"
+# 知識庫 (kb, mem 由 .zshrc-wrap 統一定義)
 
 yd-info() {
   sed -n '1,220p' "$WORKSPACE_ROOT/PROJECTS_INFO.md"
@@ -44,9 +45,9 @@ yd-status() {
 }
 
 # Skill 飛輪部署
-alias skill-deploy="bash '$WORKSPACE_ROOT/scripts/skill-deploy.sh'"
-alias skill-list="bash '$WORKSPACE_ROOT/scripts/skill-deploy.sh' --list"
-alias skill-status="bash '$WORKSPACE_ROOT/scripts/skill-deploy.sh' --status"
+alias skill-deploy="bash '$WORKSPACE_ROOT/scripts/deploy/skill-deploy.sh'"
+alias skill-list="bash '$WORKSPACE_ROOT/scripts/deploy/skill-deploy.sh' --list"
+alias skill-status="bash '$WORKSPACE_ROOT/scripts/deploy/skill-deploy.sh' --status"
 
 # 新專案快速建立
 skill-new() {

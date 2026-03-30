@@ -325,7 +325,7 @@ For cloud synchronization and team dashboards, use the backend project under `pr
 ### Quick Deploy to Railway
 
 ```bash
-bash scripts/deploy-railway.sh
+bash scripts/deploy/deploy-railway.sh
 ```
 
 This automates:
@@ -350,9 +350,10 @@ The legacy top-level `web/` dashboard and `server/` backend are not present in t
 
 - `scripts/session-wrap.sh` — Core session wrapping
 - `scripts/obsidian-sync.sh` — Knowledge vault sync
-- `scripts/deploy-railway.sh` — Railway backend deployment automation
-- `scripts/setup.sh` — One-command project initialization
-- `scripts/agent-*.sh` — 7 agent coordination tools
+- `scripts/deploy/deploy-railway.sh` — Railway backend deployment automation
+- `scripts/deploy/skill-deploy.sh` — Skill deployment automation
+- `scripts/agent/*.sh` — 7 agent coordination tools
+- `scripts/viz/*.sh` — Visualization tools
 - `.zshrc-wrap` — Aliases and workflow aliases
 - `package.json` — npm metadata
 
@@ -485,7 +486,7 @@ agent-knowledge get "architecture"        # Understand design
 
 #### Added
 - 🚀 `scripts/setup.sh` — One-command project initialization (15 min → 2 min)
-- 🔧 `scripts/deploy-railway.sh` — Automated Railway backend deployment
+- 🔧 `scripts/deploy/deploy-railway.sh` — Automated Railway backend deployment
 - 🎯 Web Dashboard (later moved under `projects/tools/`) — Real-time team monitoring with React + Vite
   - TaskBoard: Visual task status columns
   - DecisionTimeline: Chronological decision history

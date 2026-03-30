@@ -19,12 +19,12 @@
   "bin": {
     "session-wrap": "scripts/session-wrap.sh",
     "obsidian-sync": "scripts/obsidian-sync.sh",
-    "agent-context": "scripts/agent-context.sh",
-    "agent-share": "scripts/agent-share.sh",
-    "agent-decision": "scripts/agent-decision.sh",
-    "agent-checkpoint": "scripts/agent-checkpoint.sh",
-    "agent-knowledge": "scripts/agent-knowledge.sh",
-    "agent-optimize": "scripts/agent-optimize.sh",
-    "agent-tasks": "scripts/agent-tasks.sh"
+    "agent-context": "scripts/agent/agent-context.sh",
+    "agent-share": "scripts/agent/agent-share.sh",
+    "agent-decision": "scripts/agent/agent-decision.sh",
+    "agent-checkpoint": "scripts/agent/agent-checkpoint.sh",
+    "agent-knowledge": "scripts/agent/agent-knowledge.sh",
+    "agent-optimize": "scripts/agent/agent-optimize.sh",
+    "agent-tasks": "scripts/agent/agent-tasks.sh"
   }
 }

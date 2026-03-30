@@ -67,6 +67,36 @@ describe("CLI session commands", () => {
       const history = JSON.parse(fs.readFileSync(path.join(ctxDir, "history.json"), "utf8"));
       expect(history.length).toBe(2);
     });
+
+    it("should recover from corrupted state.json by creating a fresh state", () => {
+      const ctxDir = path.join(tmpDir, ".ctx");
+      fs.mkdirSync(ctxDir, { recursive: true });
+      fs.writeFileSync(path.join(ctxDir, "state.json"), "not json");
+
+      const output = execSync(`node "${CLI}" reset`, { cwd: tmpDir, encoding: "utf8" });
+
+      expect(output).toContain("state.json is corrupted");
+      const state = JSON.parse(fs.readFileSync(path.join(ctxDir, "state.json"), "utf8"));
+      expect(state.usedTokens).toBe(0);
+      expect(state.filesRead).toEqual([]);
+    });
+
+    it("should recover from corrupted history.json when archiving a valid state", () => {
+      const ctxDir = path.join(tmpDir, ".ctx");
+      fs.mkdirSync(ctxDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(ctxDir, "state.json"),
+        JSON.stringify({ maxTokens: 200000, usedTokens: 25000, filesRead: [{ path: "a.js" }], dupCount: 1, toolCallCount: 2, writeCount: 0, startedAt: "2026-03-27T10:00:00Z" })
+      );
+      fs.writeFileSync(path.join(ctxDir, "history.json"), "not json");
+
+      const output = execSync(`node "${CLI}" reset`, { cwd: tmpDir, encoding: "utf8" });
+
+      expect(output).toContain("history.json is corrupted");
+      const history = JSON.parse(fs.readFileSync(path.join(ctxDir, "history.json"), "utf8"));
+      expect(history.length).toBe(1);
+      expect(history[0].usedTokens).toBe(25000);
+    });
   });
 
   describe("history", () => {
@@ -85,6 +115,18 @@ describe("CLI session commands", () => {
       const output = execSync(`node "${CLI}" history`, { cwd: tmpDir, encoding: "utf8" });
       expect(output).toContain("1 sessions");
       expect(output).toContain("80K");
+    });
+
+    it("should recover from corrupted history.json", () => {
+      const ctxDir = path.join(tmpDir, ".ctx");
+      fs.mkdirSync(ctxDir, { recursive: true });
+      fs.writeFileSync(path.join(ctxDir, "history.json"), "not json");
+
+      const output = execSync(`node "${CLI}" history`, { cwd: tmpDir, encoding: "utf8" });
+
+      expect(output).toContain("History file is corrupted");
+      const history = JSON.parse(fs.readFileSync(path.join(ctxDir, "history.json"), "utf8"));
+      expect(history).toEqual([]);
     });
   });
 

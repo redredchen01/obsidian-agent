@@ -21,6 +21,12 @@ const BUDGETS = {
 
 const ICONS = { green: "\u{1F7E2}", yellow: "\u{1F7E1}", orange: "\u{1F7E0}", red: "\u{1F534}" };
 
+function escapeTableCell(value) {
+  return String(value)
+    .replace(/\r?\n/g, " ")
+    .replace(/\|/g, "\\|");
+}
+
 class StateManager {
   constructor({ ctxDir }) {
     this.ctxDir = ctxDir;
@@ -146,7 +152,7 @@ class StateManager {
     ];
 
     for (const f of this._data.filesRead) {
-      lines.push(`| ${f.path} | ${f.lines} | ${f.readCount}x |`);
+      lines.push(`| ${escapeTableCell(f.path)} | ${escapeTableCell(f.lines)} | ${escapeTableCell(`${f.readCount}x`)} |`);
     }
 
     lines.push("");

@@ -44,6 +44,19 @@ describe("CLI init command", () => {
     expect(after.usedTokens).toBe(50000); // preserved
   });
 
+  it("should recreate corrupted state.json", () => {
+    const statePath = path.join(tmpDir, ".ctx", "state.json");
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    fs.writeFileSync(statePath, "not json");
+
+    const output = execSync(`node "${CLI}" init`, { cwd: tmpDir, encoding: "utf8" });
+
+    expect(output).toContain("state.json was corrupted");
+    const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    expect(state.maxTokens).toBe(200000);
+    expect(state.usedTokens).toBe(0);
+  });
+
   it("should add .ctx/ to .gitignore if exists", () => {
     fs.writeFileSync(path.join(tmpDir, ".gitignore"), "node_modules/\n");
     execSync(`node "${CLI}" init`, { cwd: tmpDir, encoding: "utf8" });

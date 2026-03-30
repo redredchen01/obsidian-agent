@@ -54,40 +54,55 @@ class CheckpointManager {
     fs.writeFileSync(path.join(this.dir, filename), content, "utf8");
   }
 
+  parseCheckpoint(filename) {
+    const content = fs.readFileSync(path.join(this.dir, filename), "utf8");
+    if (!content.startsWith("---")) return null;
+
+    const pctMatch = content.match(/percentage:\s*(\d+)/);
+    const threshMatch = content.match(/threshold:\s*(\w+)/);
+    const tsMatch = content.match(/timestamp:\s*(.+)/);
+
+    const bodyLines = content.split("---").slice(2).join("---").trim().split("\n");
+    let summary = "";
+    for (const line of bodyLines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#") && !trimmed.startsWith("---")) {
+        summary = trimmed;
+        break;
+      }
+    }
+
+    const rawTimestamp = tsMatch ? tsMatch[1].trim() : null;
+    const parsedTimestamp = rawTimestamp ? Date.parse(rawTimestamp) : NaN;
+
+    if (!summary && !pctMatch) return null;
+
+    return {
+      filename,
+      percentage: pctMatch ? parseInt(pctMatch[1]) : 0,
+      threshold: threshMatch ? threshMatch[1] : "unknown",
+      timestamp: Number.isNaN(parsedTimestamp) ? null : rawTimestamp,
+      summary,
+    };
+  }
+
   list() {
     const files = fs
       .readdirSync(this.dir)
       .filter((f) => f.startsWith("ctx-checkpoint-") && f.endsWith(".md"));
 
-    const parsed = files.map((f) => {
-      const content = fs.readFileSync(path.join(this.dir, f), "utf8");
-      const pctMatch = content.match(/percentage: (\d+)/);
-      const threshMatch = content.match(/threshold: (\w+)/);
-      const tsMatch = content.match(/timestamp: (.+)/);
+    const parsed = files.map((f) => this.parseCheckpoint(f)).filter(Boolean);
 
-      const bodyLines = content.split("---").slice(2).join("---").trim().split("\n");
-      let summary = "";
-      for (const line of bodyLines) {
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith("#") && !trimmed.startsWith("---")) {
-          summary = trimmed;
-          break;
-        }
-      }
-
-      return {
-        filename: f,
-        percentage: pctMatch ? parseInt(pctMatch[1]) : 0,
-        threshold: threshMatch ? threshMatch[1] : "unknown",
-        timestamp: tsMatch ? tsMatch[1].trim() : null,
-        summary,
-      };
-    });
-
-    // Sort by timestamp descending (newest first)
+    // Sort by valid timestamp descending, then filename descending as a stable fallback.
     parsed.sort((a, b) => {
-      if (!a.timestamp || !b.timestamp) return 0;
-      return new Date(b.timestamp) - new Date(a.timestamp);
+      const aTime = a.timestamp ? Date.parse(a.timestamp) : NaN;
+      const bTime = b.timestamp ? Date.parse(b.timestamp) : NaN;
+      const aValid = !Number.isNaN(aTime);
+      const bValid = !Number.isNaN(bTime);
+
+      if (aValid && bValid && aTime !== bTime) return bTime - aTime;
+      if (aValid !== bValid) return aValid ? -1 : 1;
+      return b.filename.localeCompare(a.filename);
     });
 
     return parsed;

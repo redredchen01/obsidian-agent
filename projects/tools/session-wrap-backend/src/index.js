@@ -10,6 +10,7 @@ const userRoutes = require('./routes/users');
 const rbacRoutes = require('./routes/rbac');
 const { router: analyticsRoutes } = require('./routes/analytics');
 const { router: integrationsRoutes } = require('./routes/integrations');
+const forecastingRoutes = require('./routes/forecasting');
 const { errorHandler } = require('./middleware/errorHandler');
 const { autoAuthenticateAgent } = require('./middleware/agent-auth');
 
@@ -42,6 +43,7 @@ app.use('/api/users', userRoutes);
 app.use('/api', rbacRoutes);
 app.use('/api', analyticsRoutes);
 app.use('/api', integrationsRoutes);
+app.use('/api/forecasting', forecastingRoutes);
 
 // Error handling
 app.use(errorHandler);
