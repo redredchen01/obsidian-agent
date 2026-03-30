@@ -65,6 +65,18 @@ obsidian-agent pin "important-note"
 obsidian-agent pin list
 obsidian-agent unpin "important-note"
 
+# Graph & discovery
+obsidian-agent neighbors "note" --depth 3 # connected notes
+obsidian-agent random 3                  # serendipitous review
+obsidian-agent focus                     # what to work on next
+
+# Stats & reporting
+obsidian-agent count                     # word/line statistics
+obsidian-agent agenda                    # pending TODOs
+obsidian-agent changelog --days 14       # recent changes
+obsidian-agent daily                     # daily dashboard
+obsidian-agent suggest                   # improvement suggestions
+
 # Maintenance
 obsidian-agent sync                      # rebuild indices
 obsidian-agent health                    # vault health score
