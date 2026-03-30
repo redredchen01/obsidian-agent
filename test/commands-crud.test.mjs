@@ -297,6 +297,7 @@ describe('commands: CRUD operations', () => {
       init(TMP);
       note(TMP, 'Archive Me', 'idea');
       note(TMP, 'Archive This Too', 'idea');
+      note(TMP, 'Archive For Timestamp', 'idea');
     });
 
     it('sets note status to archived', async () => {
@@ -325,8 +326,9 @@ describe('commands: CRUD operations', () => {
 
     it('updates timestamp when archiving', async () => {
       const { archive } = await import('../src/commands/archive.mjs');
-      const result = archive(TMP, 'archive-me');
-      assert.ok(result.updated);
+      const result = archive(TMP, 'archive-for-timestamp');
+      assert.equal(result.status, 'archived');
+      assert.ok(result.updated && typeof result.updated === 'string');
     });
 
     it('throws error for missing note name', async () => {

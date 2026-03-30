@@ -260,7 +260,14 @@ export class Vault {
     let content = this.read(filePath);
     if (!content) return null;
     for (const [key, val] of Object.entries(updates)) {
-      const strVal = Array.isArray(val) ? `[${val.join(', ')}]` : `"${val}"`;
+      let strVal;
+      if (Array.isArray(val)) {
+        strVal = `[${val.join(', ')}]`;
+      } else if (key === 'status') {
+        strVal = val;
+      } else {
+        strVal = `"${val}"`;
+      }
       const regex = new RegExp(`^(${key}:)\\s*.*$`, 'm');
       if (content.match(regex)) {
         content = content.replace(regex, `$1 ${strVal}`);
