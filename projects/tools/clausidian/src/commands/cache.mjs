@@ -3,7 +3,7 @@
  */
 
 import { join } from 'path';
-import { existsSync, unlinkSync } from 'fs';
+import { existsSync, unlinkSync, statSync } from 'fs';
 import { Vault } from '../vault.mjs';
 
 /**
@@ -30,18 +30,36 @@ export async function cache(vaultRoot, { subcommand } = {}) {
 function cacheStats(vaultRoot) {
   const vault = new Vault(vaultRoot);
   const stats = vault._clusterCache.stats();
+  const cacheDir = join(vaultRoot, '.clausidian');
+  const cachePath = join(cacheDir, 'cache.json');
+  const diskCacheExists = existsSync(cachePath);
+
+  let diskCacheSizeBytes = 0;
+  let diskCacheAgeMins = 0;
+
+  if (diskCacheExists) {
+    const stat = statSync(cachePath);
+    diskCacheSizeBytes = stat.size;
+    diskCacheAgeMins = Math.floor((Date.now() - stat.mtimeMs) / 1000 / 60);
+  }
 
   const hitRate = stats.hits + stats.misses === 0
     ? 'N/A'
     : `${((stats.hits / (stats.hits + stats.misses)) * 100).toFixed(1)}%`;
 
   return {
-    hits: stats.hits,
-    misses: stats.misses,
-    size: `${(stats.size / 1024).toFixed(2)} KB`,
-    age: `${Math.floor(stats.age / 1000)} seconds`,
-    vaultVersion: stats.vaultVersion.slice(0, 8) + '...',
-    hitRate
+    status: 'stats',
+    cache: {
+      diskCacheExists,
+      diskCacheSizeBytes,
+      diskCacheAgeMins,
+      hits: stats.hits,
+      misses: stats.misses,
+      size: `${(stats.size / 1024).toFixed(2)} KB`,
+      age: `${Math.floor(stats.age / 1000)} seconds`,
+      vaultVersion: stats.vaultVersion.slice(0, 8) + '...',
+      hitRate
+    }
   };
 }
 
@@ -54,13 +72,16 @@ function cacheClear(vaultRoot) {
   const cachePath = join(cacheDir, 'cache.json');
 
   try {
-    if (existsSync(cachePath)) {
+    const cacheExists = existsSync(cachePath);
+    if (cacheExists) {
       unlinkSync(cachePath);
+      vault._clusterCache.invalidate();
+      return { status: 'cleared' };
+    } else {
+      return { status: 'already_cleared' };
     }
-    vault._clusterCache.invalidate();
-    return { success: true, message: 'Cache cleared' };
   } catch (err) {
-    return { success: false, message: `Failed to clear cache: ${err.message}` };
+    return { status: 'error', message: `Failed to clear cache: ${err.message}` };
   }
 }
 
