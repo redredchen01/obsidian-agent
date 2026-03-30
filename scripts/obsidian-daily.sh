@@ -3,19 +3,19 @@
 set -e
 
 VAULT='/Users/dex/YD 2026/obsidian'
-export PATH="/Users/dex/.local/bin:/usr/local/bin:$PATH"
+export PATH="/Users/dex/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 # 1. Create today's journal (idempotent)
-obsidian-agent journal --vault "$VAULT" 2>/dev/null || true
+clausidian journal --vault "$VAULT" 2>/dev/null || true
 
 # 2. Backfill any missing journals from yesterday
-obsidian-agent hook daily-backfill --vault "$VAULT" 2>/dev/null || true
+clausidian hook daily-backfill --vault "$VAULT" 2>/dev/null || true
 
 # 3. Sync indices (includes A5: suggested links)
-obsidian-agent sync --vault "$VAULT" 2>/dev/null || true
+clausidian sync --vault "$VAULT" 2>/dev/null || true
 
 # 4. A2: Idea lifecycle temperature tracking
-obsidian-agent health --vault "$VAULT" --json 2>/dev/null | grep -q '"grade"' && true
+clausidian health --vault "$VAULT" --json 2>/dev/null | grep -q '"grade"' && true
 
 # 5. Auto-commit if there are changes
 cd "$VAULT"

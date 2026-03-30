@@ -6,17 +6,17 @@ VAULT='/Users/dex/YD 2026/obsidian'
 export PATH="/Users/dex/.local/bin:/usr/local/bin:$PATH"
 
 # 1. Generate monthly review
-obsidian-agent review monthly --vault "$VAULT" 2>/dev/null || true
+clausidian review monthly --vault "$VAULT" 2>/dev/null || true
 
 # 2. Health check
-obsidian-agent health --vault "$VAULT" 2>/dev/null
+clausidian health --vault "$VAULT" 2>/dev/null
 
 # 3. Find duplicates
 echo "--- Duplicates ---"
-obsidian-agent duplicates --vault "$VAULT" 2>/dev/null || true
+clausidian duplicates --vault "$VAULT" 2>/dev/null || true
 
 # 4. Sync indexes
-obsidian-agent sync --vault "$VAULT" 2>/dev/null || true
+clausidian sync --vault "$VAULT" 2>/dev/null || true
 
 # 5. Auto-commit if changes
 cd "$VAULT"
