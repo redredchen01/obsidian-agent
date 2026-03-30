@@ -375,6 +375,30 @@ async function main() {
       break;
     }
 
+    case 'neighbors': {
+      const { neighbors } = await import('../src/commands/neighbors.mjs');
+      result = neighbors(resolveVault(flags), positional[0], {
+        depth: flags.depth ? parseInt(flags.depth) : undefined,
+      });
+      break;
+    }
+
+    case 'random': {
+      const { random } = await import('../src/commands/random.mjs');
+      result = random(resolveVault(flags), {
+        count: positional[0] ? parseInt(positional[0]) : flags.count ? parseInt(flags.count) : undefined,
+        type: flags.type,
+        status: flags.status,
+      });
+      break;
+    }
+
+    case 'focus': {
+      const { focus } = await import('../src/commands/focus.mjs');
+      result = focus(resolveVault(flags));
+      break;
+    }
+
     // ── existing utility commands ────────────────────
 
     case 'setup': {
@@ -488,6 +512,9 @@ Commands:
   count                    Word/line/note count statistics
   agenda                   Pending TODO items from journals & projects
   changelog [output]       Generate vault changelog from recent activity
+  neighbors <note>         Show connected notes within N hops (--depth)
+  random [count]           Pick random note(s) for review
+  focus                    Suggest what to work on next
 
   setup [vault-path]       Install MCP server + skill
   watch                    Auto-rebuild indices on file changes
@@ -520,7 +547,7 @@ Flags:
         'watch','health','setup','serve','hook','version','help',
         'rename','move','merge','duplicates','broken-links','batch','export','import',
         'link','timeline','validate','pin','unpin','relink','suggest','daily',
-        'count','agenda','changelog',
+        'count','agenda','changelog','neighbors','random','focus',
       ];
       const similar = cmds.filter(c => c.startsWith(command?.slice(0, 2) || '') || levenshtein(c, command) <= 2);
       console.error(`Unknown command: ${command}`);

@@ -74,6 +74,9 @@ description: |
 | 修复坏链 | `relink` | `{dry_run?: false}` — fuzzy match 修复 |
 | 改进建议 | `suggest` | `{limit?: 10}` — 孤岛/过期/缺标签/坏链 |
 | 每日仪表盘 | `daily` | `{}` — journal+活动+钉选+项目 |
+| 字数统计 | `count` | `{type?}` — 按类型统计字数/行数 |
+| 待办事项 | `agenda` | `{days?: 7, all?: false}` — 从日志和项目提取未完成 TODO |
+| 变更日志 | `changelog` | `{days?: 7}` — 按日期分组的变更记录 |
 | 周回顾 | **CLI:** `obsidian-agent review` | |
 | 月回顾 | **CLI:** `obsidian-agent review monthly` | |
 | 导入笔记 | **CLI:** `obsidian-agent import <file>` | |

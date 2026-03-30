@@ -591,7 +591,29 @@ describe('commands (import)', () => {
     assert.ok(result.dates > 0);
   });
 
-  it('MCP server exposes all tools (41)', async () => {
+  it('neighbors finds connected notes', async () => {
+    const { neighbors } = await import('../src/commands/neighbors.mjs');
+    const result = neighbors(TMP, 'test-project', { depth: 2 });
+    assert.equal(result.center, 'test-project');
+    assert.ok(Array.isArray(result.neighbors));
+    // test-project has links, so should have neighbors
+    assert.ok(result.neighbors.length > 0);
+  });
+
+  it('random picks notes', async () => {
+    const { random } = await import('../src/commands/random.mjs');
+    const result = random(TMP, { count: 3 });
+    assert.ok(result.notes.length > 0);
+    assert.ok(result.notes.length <= 3);
+  });
+
+  it('focus returns suggestions', async () => {
+    const { focus } = await import('../src/commands/focus.mjs');
+    const result = focus(TMP);
+    assert.ok(Array.isArray(result.suggestions));
+  });
+
+  it('MCP server exposes all tools (44)', async () => {
     const { McpServer } = await import('../src/mcp-server.mjs');
     const server = new McpServer(TMP);
     const tools = server.handleMessage({
@@ -610,6 +632,9 @@ describe('commands (import)', () => {
     assert.ok(names.includes('count'));
     assert.ok(names.includes('agenda'));
     assert.ok(names.includes('changelog'));
-    assert.ok(tools.result.tools.length >= 38);
+    assert.ok(names.includes('neighbors'));
+    assert.ok(names.includes('random'));
+    assert.ok(names.includes('focus'));
+    assert.ok(tools.result.tools.length >= 41);
   });
 });

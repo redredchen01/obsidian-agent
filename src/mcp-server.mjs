@@ -57,6 +57,9 @@ const TOOLS = [
   { name: 'count', description: 'Word/line/note count statistics', inputSchema: { type: 'object', properties: { type: { type: 'string', description: 'Filter by note type' } } } },
   { name: 'agenda', description: 'Pending TODO items from journals and projects', inputSchema: { type: 'object', properties: { days: { type: 'number', description: 'Days to scan (default: 7)' }, all: { type: 'boolean', description: 'Scan all notes, not just recent' } } } },
   { name: 'changelog', description: 'Generate vault changelog from recent activity', inputSchema: { type: 'object', properties: { days: { type: 'number', description: 'Days (default: 7)' } } } },
+  { name: 'neighbors', description: 'Show connected notes within N hops', inputSchema: { type: 'object', properties: { note: { type: 'string' }, depth: { type: 'number', description: 'Max hops (default: 2)' } }, required: ['note'] } },
+  { name: 'random', description: 'Pick random note(s) for serendipitous review', inputSchema: { type: 'object', properties: { count: { type: 'number', description: 'How many (default: 1)' }, type: { type: 'string' }, status: { type: 'string' } } } },
+  { name: 'focus', description: 'Suggest what to work on next', inputSchema: { type: 'object', properties: {} } },
 ];
 
 // ── Dispatch table ───────────────────────────────────
@@ -104,6 +107,9 @@ const DISPATCH = {
   async count(root, a) { const { count } = await import('./commands/count.mjs'); return count(root, { type: a.type }); },
   async agenda(root, a) { const { agenda } = await import('./commands/agenda.mjs'); return agenda(root, { days: a.days, all: a.all }); },
   async changelog(root, a) { const { changelog } = await import('./commands/changelog.mjs'); return changelog(root, { days: a.days }); },
+  async neighbors(root, a) { const { neighbors } = await import('./commands/neighbors.mjs'); return neighbors(root, a.note, { depth: a.depth }); },
+  async random(root, a) { const { random } = await import('./commands/random.mjs'); return random(root, { count: a.count, type: a.type, status: a.status }); },
+  async focus(root) { const { focus } = await import('./commands/focus.mjs'); return focus(root); },
 };
 
 // ── Server class ─────────────────────────────────────
