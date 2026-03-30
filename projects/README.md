@@ -32,7 +32,7 @@ cd experimental/dspy-trial
 
 ```bash
 cd tools/ctx
-cd tools/obsidian-agent
+cd tools/clausidian
 cd tools/session-wrap-backend
 cd tools/session-wrap-skill
 ```
