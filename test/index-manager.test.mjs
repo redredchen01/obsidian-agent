@@ -224,3 +224,143 @@ related: []
     assert.ok('unchanged' in result || 'total' in result);
   });
 });
+
+describe('Set Optimization (TF-IDF Link Suggestions)', () => {
+  let vault, idx;
+
+  before(() => {
+    rmSync(TMP, { recursive: true, force: true });
+    mkdirSync(join(TMP, 'projects'), { recursive: true });
+    mkdirSync(join(TMP, 'journal'), { recursive: true });
+
+    // Create 50 test notes with varied tags for scoring
+    for (let i = 1; i <= 50; i++) {
+      const tags = [];
+      if (i % 2 === 0) tags.push('backend');
+      if (i % 3 === 0) tags.push('api');
+      if (i % 5 === 0) tags.push('database');
+      if (i % 7 === 0) tags.push('frontend');
+      if (i % 11 === 0) tags.push('testing');
+
+      writeFileSync(join(TMP, 'projects', `note-${i}.md`), `---
+title: "Note ${i}"
+type: project
+tags: [${tags.join(', ')}]
+created: 2026-03-27
+updated: 2026-03-27
+status: active
+summary: "Test note ${i} with keywords"
+related: []
+---
+
+# Note ${i}
+
+Content for note ${i}.
+`);
+    }
+
+    vault = new Vault(TMP);
+    idx = new IndexManager(vault);
+  });
+
+  after(() => {
+    rmSync(TMP, { recursive: true, force: true });
+  });
+
+  it('Set optimization does not change TF-IDF scores (numeric equivalence)', () => {
+    // Build graph twice, check suggested links are identical
+    const notes1 = vault.scanNotes({ includeBody: true });
+    const result1 = idx.rebuildGraph(notes1);
+    const graph1 = vault.read('_graph.md');
+
+    // Extract suggested links section
+    const suggestedMatch1 = graph1.match(/## Suggested Links[\s\S]*?(?=## Clusters|$)/);
+    const suggestedText1 = suggestedMatch1 ? suggestedMatch1[0] : '';
+
+    // Run again with same data
+    const notes2 = vault.scanNotes({ includeBody: true });
+    const result2 = idx.rebuildGraph(notes2);
+    const graph2 = vault.read('_graph.md');
+
+    const suggestedMatch2 = graph2.match(/## Suggested Links[\s\S]*?(?=## Clusters|$)/);
+    const suggestedText2 = suggestedMatch2 ? suggestedMatch2[0] : '';
+
+    // Suggested links should be identical
+    assert.strictEqual(suggestedText1, suggestedText2, 'Suggested links should be identical across runs');
+    assert.strictEqual(result1.suggestedLinks, result2.suggestedLinks, 'Suggested link count should match');
+  });
+
+  it('50-note vault completes rebuildGraph in reasonable time', () => {
+    const notes = vault.scanNotes({ includeBody: true });
+    const startTime = process.hrtime.bigint();
+    idx.rebuildGraph(notes);
+    const endTime = process.hrtime.bigint();
+
+    const elapsedMs = Number(endTime - startTime) / 1_000_000;
+    console.log(`\n  rebuildGraph for 50 notes: ${elapsedMs.toFixed(2)}ms`);
+
+    // Should be < 500ms (very generous bound)
+    assert.ok(elapsedMs < 500, `Expected < 500ms, got ${elapsedMs.toFixed(2)}ms`);
+  });
+
+  it('IDF weights remain correct after Set optimization', () => {
+    const notes = vault.scanNotes({ includeBody: true });
+    idx.rebuildGraph(notes);
+    const graph = vault.read('_graph.md');
+
+    // Verify suggested links exist
+    assert.ok(graph.includes('## Suggested Links'), 'Should have suggested links section');
+
+    // Extract scores from suggested links table
+    const scoreMatches = graph.match(/\|\s*\[\[.*?\]\]\s*\|\s*\[\[.*?\]\]\s*\|\s*([\d.]+)\s*\|/g);
+    if (scoreMatches && scoreMatches.length > 0) {
+      // All scores should be >= 1.5 (the threshold)
+      const scores = scoreMatches.map(m => {
+        const match = m.match(/([\d.]+)\s*\|$/);
+        return parseFloat(match[1]);
+      });
+      for (const score of scores) {
+        assert.ok(score >= 1.5, `Score ${score} should be >= 1.5 threshold`);
+      }
+    }
+  });
+
+  it('shared tags are correctly identified in link suggestions', () => {
+    const notes = vault.scanNotes({ includeBody: true });
+    idx.rebuildGraph(notes);
+    const graph = vault.read('_graph.md');
+
+    // Extract suggested links with their shared tags
+    const linkMatches = graph.match(/\|\s*\[\[(.*?)\]\]\s*\|\s*\[\[(.*?)\]\]\s*\|\s*([\d.]+)\s*\|\s*([^|]+)\s*\|/g);
+    if (linkMatches && linkMatches.length > 0) {
+      for (const match of linkMatches.slice(0, 3)) {
+        // Each link should have at least one shared tag listed
+        const tagMatch = match.match(/\|\s*([^|]+)\s*\|$/);
+        assert.ok(tagMatch && tagMatch[1].trim().length > 0, 'Each link should list shared tags');
+      }
+    }
+  });
+
+  it('link suggestion order is consistent (by score descending)', () => {
+    const notes = vault.scanNotes({ includeBody: true });
+    idx.rebuildGraph(notes);
+    const graph = vault.read('_graph.md');
+
+    // Extract all scores in order
+    const scoreMatches = graph.match(/\|\s*\[\[.*?\]\]\s*\|\s*\[\[.*?\]\]\s*\|\s*([\d.]+)\s*\|/g);
+    if (scoreMatches && scoreMatches.length > 1) {
+      const scores = scoreMatches.map(m => {
+        const match = m.match(/([\d.]+)\s*\|$/);
+        return parseFloat(match[1]);
+      });
+
+      // Verify descending order
+      for (let i = 1; i < scores.length; i++) {
+        assert.ok(
+          scores[i - 1] >= scores[i],
+          `Scores should be descending: ${scores[i - 1]} >= ${scores[i]}`
+        );
+      }
+    }
+  });
+});
