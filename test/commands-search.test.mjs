@@ -26,6 +26,7 @@ describe('commands: search and filtering', () => {
     note(TMP, 'Backend Optimization', 'resource', { tags: ['backend', 'performance'] });
     note(TMP, 'System Design Patterns', 'area', { tags: ['design', 'architecture'] });
     note(TMP, 'Testing Best Practices', 'area', { tags: ['testing', 'quality'] });
+    note(TMP, 'Unit Test Framework', 'resource', { tags: ['testing', 'quality'] });
 
     capture(TMP, 'Quick search implementation idea');
 
