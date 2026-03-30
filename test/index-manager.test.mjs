@@ -67,7 +67,7 @@ related: []
     assert.ok(result.relationships > 0);
     const content = vault.read('_graph.md');
     assert.ok(content.includes('[[my-project]]'));
-    assert.ok(content.includes('nav-prev'));
+    assert.ok(content.includes('| nav |'));
   });
 
   it('updateDirIndex creates/updates index', () => {
