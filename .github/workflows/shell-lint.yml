@@ -1,0 +1,48 @@
+name: Shell Script Linting
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - '**.sh'
+      - '.shellcheckrc'
+      - '.github/workflows/shell-lint.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '**.sh'
+      - '.shellcheckrc'
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck
+        run: |
+          echo "Checking shell scripts..."
+          shellcheck \
+            install.sh \
+            setup.sh \
+            health.sh \
+            verify.sh \
+            scripts/test-all.sh \
+            scripts/pre-commit || true
+
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check shell script syntax
+        run: |
+          echo "Verifying shell script syntax..."
+          for script in install.sh setup.sh health.sh verify.sh scripts/test-all.sh scripts/pre-commit; do
+            echo "Checking $script..."
+            bash -n "$script"
+          done
+          echo "✓ All shell scripts have valid syntax"
