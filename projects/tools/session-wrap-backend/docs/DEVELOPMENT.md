@@ -353,7 +353,7 @@ Files:
 ### Frontend Build
 
 ```bash
-cd web
+cd ~/YD\ 2026/projects/tools/session-wrap-backend/web
 npm run build           # Production build
 
 # Output in web/dist/
