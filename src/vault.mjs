@@ -4,6 +4,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'fs';
 import { resolve, join, dirname } from 'path';
 import { FileHasher } from './file-hasher.mjs';
+import { SelectiveInvalidation } from './vault-selective-invalidation.mjs';
 
 const DEFAULT_DIRS = ['areas', 'projects', 'resources', 'journal', 'ideas'];
 
@@ -14,6 +15,7 @@ export class Vault {
     this._notesCache = null;
     this._notesCacheWithBody = null;
     this._fileHashes = null;
+    this._selectiveInvalidation = new SelectiveInvalidation();
   }
 
   _detectDirs() {
@@ -56,6 +58,17 @@ export class Vault {
     const dir = dirname(p);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(p, content);
+
+    // Mark note as dirty for selective invalidation
+    // args = ['dir', 'filename.md'], so build noteId by stripping .md from last segment
+    if (args.length > 0) {
+      const lastIdx = args.length - 1;
+      const segments = [...args];
+      segments[lastIdx] = segments[lastIdx].replace(/\.md$/, '');
+      const noteId = segments.join('/');
+      this._selectiveInvalidation.markDirty(noteId, ['tags', 'graph']);
+    }
+
     this.invalidateCache();
   }
 
