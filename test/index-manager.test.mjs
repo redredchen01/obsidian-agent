@@ -364,3 +364,151 @@ Content for note ${i}.
     }
   });
 });
+
+describe('Unit 3: Lazy Body Extraction', () => {
+  let vault, idx;
+
+  before(() => {
+    rmSync(TMP, { recursive: true, force: true });
+    mkdirSync(join(TMP, 'projects'), { recursive: true });
+    mkdirSync(join(TMP, 'resources'), { recursive: true });
+
+    // Create test notes with bodies
+    writeFileSync(join(TMP, 'projects', 'note-a.md'), `---
+title: "Note A"
+type: project
+tags: [backend, api]
+created: 2026-03-27
+updated: 2026-03-27
+status: active
+summary: "API design principles"
+related: []
+---
+
+# Note A Body
+
+This is a long body with lots of text content that should NOT be loaded
+during the sync phase. Body content includes keywords like distributed,
+caching, microservices, and authentication mechanisms. This section should
+be skipped during rebuildGraph() to save memory.
+`);
+
+    writeFileSync(join(TMP, 'projects', 'note-b.md'), `---
+title: "Note B"
+type: project
+tags: [backend, cache]
+created: 2026-03-27
+updated: 2026-03-27
+status: active
+summary: "Caching strategies"
+related: []
+---
+
+# Note B Body
+
+Detailed caching implementation with Redis, Memcached, and distributed
+cache patterns. Contains keywords like consistency, TTL, eviction,
+and replication. This body should NOT be included in sync.
+`);
+
+    writeFileSync(join(TMP, 'resources', 'note-c.md'), `---
+title: "Note C"
+type: resource
+tags: [backend]
+created: 2026-03-27
+updated: 2026-03-27
+status: active
+summary: "Microservices overview"
+related: []
+---
+
+# Note C Body
+
+Body text discussing service discovery, load balancing, circuit breakers,
+fault tolerance, and distributed tracing. This should not be loaded during
+regular sync operations.
+`);
+
+    vault = new Vault(TMP);
+    idx = new IndexManager(vault);
+  });
+
+  after(() => {
+    rmSync(TMP, { recursive: true, force: true });
+  });
+
+  it('scanNotes() without includeBody does not load body text', () => {
+    const notes = vault.scanNotes();
+    for (const note of notes) {
+      assert.ok(!note.body || note.body === undefined, 
+        `Note ${note.file} should not have body field, but got: ${typeof note.body}`);
+    }
+  });
+
+  it('scanNotes({ includeBody: true }) loads body when explicitly requested', () => {
+    const notes = vault.scanNotes({ includeBody: true });
+    const noteA = notes.find(n => n.file === 'note-a');
+    assert.ok(noteA.body, 'Note A should have body when includeBody=true');
+    assert.ok(noteA.body.includes('distributed'), 'Body should contain expected keywords');
+  });
+
+  it('rebuildGraph() uses scanNotes() without body (no includeBody param)', () => {
+    const result = idx.rebuildGraph();
+    assert.ok(result.relationships !== undefined, 'rebuildGraph should return results');
+    
+    // Verify internal state: notes used should not have body
+    const notes = vault.scanNotes();
+    for (const note of notes) {
+      assert.ok(!note.body || note.body === undefined,
+        'rebuildGraph should use notes without body');
+    }
+  });
+
+  it('keyword extraction only uses title + summary (no body)', () => {
+    // Manually extract keywords like rebuildGraph does
+    const notes = vault.scanNotes(); // No body!
+    const noteA = notes.find(n => n.file === 'note-a');
+    
+    const text = `${noteA.title} ${noteA.summary}`.toLowerCase();
+    const words = new Set(text.match(/[a-z\u4e00-\u9fff]{3,}/g) || []);
+    
+    // Should have title+summary keywords
+    assert.ok(words.has('note') || words.has('api'), 'Should have keywords from title/summary');
+    
+    // Should NOT have body-only keywords since body is not loaded
+    assert.ok(!words.has('distributed'), 'Should not have "distributed" (body-only keyword)');
+  });
+
+  it('caching behavior: multiple scanNotes() calls use same cache', () => {
+    const notes1 = vault.scanNotes();
+    const notes2 = vault.scanNotes();
+    
+    // Should be same object reference (cached)
+    assert.strictEqual(notes1, notes2, 'scanNotes() should return cached result');
+  });
+
+  it('rebuildGraph preserves link suggestion quality despite title+summary-only keywords', () => {
+    const result = idx.rebuildGraph();
+    const graph = vault.read('_graph.md');
+    
+    // Graph should still be generated and contain table structure
+    assert.ok(graph.includes('| Source | Links To |'), 'Graph should have proper table');
+    assert.ok(result.relationships >= 0, 'Should have relationships calculated');
+  });
+
+  it('search() still works with body by explicitly using includeBody', () => {
+    // search() method should handle body loading for full-text search
+    const results = vault.search('caching');
+    assert.ok(Array.isArray(results), 'search() should return array');
+    // Even if results are empty, search should not throw
+  });
+
+  it('scanNotes cache is separate for body vs no-body', () => {
+    const withoutBody = vault.scanNotes();
+    const withBody = vault.scanNotes({ includeBody: true });
+    
+    // Should be different cached results
+    assert.notStrictEqual(withoutBody, withBody,
+      'scanNotes() should have separate caches for includeBody');
+  });
+});

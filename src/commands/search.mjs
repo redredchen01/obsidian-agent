@@ -6,11 +6,13 @@ import { Vault } from '../vault.mjs';
 export function search(vaultRoot, keyword, { type, tag, status, regex } = {}) {
   const vault = new Vault(vaultRoot);
 
-  if (!keyword) {
+  const hasFilters = type || tag || status;
+  if (!keyword && !hasFilters) {
     throw new Error('Usage: clausidian search <keyword> [--type TYPE] [--tag TAG] [--status STATUS] [--regex]');
   }
 
-  const results = vault.search(keyword, { type, tag, status, regex });
+
+  const results = vault.search(keyword || '', { type, tag, status, regex });
 
   if (!results.length) {
     console.log(`No results for "${keyword}"`);
