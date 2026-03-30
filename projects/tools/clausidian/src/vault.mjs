@@ -104,6 +104,13 @@ export class Vault {
     const dir = dirname(p);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(p, content);
+
+    // Track dirty note for selective invalidation
+    if (args.length > 0) {
+      const fileName = args[args.length - 1];
+      this._dirtyNotes.add(fileName);
+    }
+
     this.invalidateCache();
   }
 
