@@ -7,26 +7,19 @@
 import { Vault } from '../vault.mjs';
 import { IndexManager } from '../index-manager.mjs';
 import { todayStr } from '../dates.mjs';
+import { buildTagIDF, extractKeywords, calculateKeywordOverlap } from '../scoring.mjs';
 
 function scorePairs(notes) {
   const nonJournal = notes.filter(n => n.type !== 'journal');
-  const totalNotes = nonJournal.length || 1;
 
   // TF-IDF for tags
-  const tagDF = {};
-  for (const n of nonJournal) {
-    for (const t of n.tags) tagDF[t] = (tagDF[t] || 0) + 1;
-  }
-  const tagIDF = {};
-  for (const [tag, df] of Object.entries(tagDF)) {
-    tagIDF[tag] = Math.log(totalNotes / df);
-  }
+  const tagIDF = buildTagIDF(notes, 'journal');
 
   // Keyword sets per note
   const noteKW = new Map();
   for (const n of nonJournal) {
-    const text = `${n.title} ${n.summary} ${(n.body || '').slice(0, 500)}`.toLowerCase();
-    noteKW.set(n.file, new Set(text.match(/[a-z\u4e00-\u9fff]{3,}/g) || []));
+    const text = `${n.title} ${n.summary} ${(n.body || '').slice(0, 500)}`;
+    noteKW.set(n.file, extractKeywords(text));
   }
 
   // Existing links (bidirectional)
@@ -62,13 +55,7 @@ function scorePairs(notes) {
       }
 
       // Keyword co-occurrence (capped at +2)
-      const kwA = noteKW.get(a.file);
-      const kwB = noteKW.get(b.file);
-      let kwOverlap = 0;
-      if (kwA && kwB) {
-        for (const w of kwA) if (kwB.has(w)) kwOverlap++;
-        score += Math.min(kwOverlap * 0.1, 2);
-      }
+      score += calculateKeywordOverlap(noteKW.get(a.file), noteKW.get(b.file));
 
       if (shared.length >= 1 && score >= 1.5) {
         pairs.push({

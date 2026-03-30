@@ -188,15 +188,7 @@ export function noteCreated(vaultRoot, payload = {}) {
     }
 
     // Build tag IDF
-    const nonJournal = allNotes.filter(n => n.dir !== 'journal' && n.tags.length > 0);
-    const tagDF = {};
-    for (const n of nonJournal) {
-      for (const t of n.tags) tagDF[t] = (tagDF[t] || 0) + 1;
-    }
-    const tagIDF = {};
-    for (const [tag, df] of Object.entries(tagDF)) {
-      tagIDF[tag] = Math.log(nonJournal.length / df);
-    }
+    const tagIDF = buildTagIDF(allNotes, 'journal');
 
     // Find top related notes
     const candidates = allNotes.filter(n => n.file !== noteName && n.dir !== 'journal' && !newNote.related.includes(n.file));
