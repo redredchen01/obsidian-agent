@@ -61,7 +61,7 @@ ns-test               # python3 -m pytest
 | 項目 | 路徑 | 用途 |
 |------|------|------|
 | `ctx` | `projects/tools/ctx/` | 上下文壓縮與 checkpoint 工具 |
-| `obsidian-agent` | `projects/tools/obsidian-agent/` | Obsidian CLI/agent 工具 |
+| `clausidian` | `projects/tools/clausidian/` | Obsidian CLI 工具包 (v2.0.0+) |
 | `session-wrap-skill` | `projects/tools/session-wrap-skill/` | 已拆出的 skill 倉庫副本 |
 | `session-wrap-backend` | `projects/tools/session-wrap-backend/` | session-wrap backend/web 實驗區 |
 
@@ -81,8 +81,7 @@ yd-info               # 顯示本文件
 
 ## 備註
 
-- `projects/production/dexapi/`
-- `projects/production/test-ydapi/`
-- `projects/production/watermark-0324/`
+- `Archived/production/`
+- `Archived/experimental/`
 
-以上三個目錄目前是空殼歷史路徑，不再作為主項目入口。
+以上目錄包含已归档的歷史項目，不再作為主項目入口。根目錄已清理，確保無重複項目。

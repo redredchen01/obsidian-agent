@@ -8,9 +8,9 @@
 - Path: `projects/tools/ctx/`
 - Purpose: 上下文壓縮、checkpoint、session tooling
 
-### obsidian-agent
-- Path: `projects/tools/obsidian-agent/`
-- Purpose: Obsidian CLI / agent automation
+### clausidian
+- Path: `projects/tools/clausidian/`
+- Purpose: Obsidian CLI toolkit for AI agents (v2.0.0+, formerly obsidian-agent)
 
 ### session-wrap-backend
 - Path: `projects/tools/session-wrap-backend/`

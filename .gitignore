@@ -39,9 +39,21 @@ __pycache__/
 /Archived/
 /.claude/
 /obsidian/
+NS_0327
+/projects/production/gwx/
+/projects/production/claude_code_telegram_bot/
 .zshrc-wrap
 scripts/login-agents.sh
 .session-wrap-trigger.json
+
+# Nested project metadata / local agent state
+.git/
+.agents/
+.claude/
+.codex/
+.coverage
+.venv/
+.pytest_cache/
 
 # Database & cache files
 *.rdb
