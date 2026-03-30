@@ -72,6 +72,8 @@ description: |
 | 取消钉选 | `unpin` | `{note}` |
 | 钉选列表 | `pin_list` | `{}` — 所有收藏笔记 |
 | 修复坏链 | `relink` | `{dry_run?: false}` — fuzzy match 修复 |
+| 改进建议 | `suggest` | `{limit?: 10}` — 孤岛/过期/缺标签/坏链 |
+| 每日仪表盘 | `daily` | `{}` — journal+活动+钉选+项目 |
 | 周回顾 | **CLI:** `obsidian-agent review` | |
 | 月回顾 | **CLI:** `obsidian-agent review monthly` | |
 | 导入笔记 | **CLI:** `obsidian-agent import <file>` | |
@@ -169,6 +171,15 @@ description: |
 5. link({dry_run: true})    — 预览缺失链接
 6. link()              — 建立链接
 7. health()            — 综合健康分
+```
+
+### 11. 每日开始
+
+```
+1. daily()              — 一览全局
+2. journal()            — 确保日志存在
+3. suggest()            — 查看改进建议
+4. 根据建议执行 link/relink/archive 等
 ```
 
 ## 写作规范

@@ -556,7 +556,42 @@ describe('commands (import)', () => {
     assert.ok(typeof result.pinned === 'number');
   });
 
-  it('MCP server exposes all tools (38)', async () => {
+  it('count returns word statistics', async () => {
+    const { count } = await import('../src/commands/count.mjs');
+    const result = count(TMP);
+    assert.ok(result.total.notes > 0);
+    assert.ok(typeof result.total.words === 'number');
+    assert.ok(typeof result.total.lines === 'number');
+    assert.ok(Object.keys(result.byType).length > 0);
+  });
+
+  it('count filters by type', async () => {
+    const { count } = await import('../src/commands/count.mjs');
+    const result = count(TMP, { type: 'project' });
+    assert.ok(Object.keys(result.byType).length <= 1);
+  });
+
+  it('agenda returns pending tasks', async () => {
+    // Ensure there's a TODO item
+    const { Vault } = await import('../src/vault.mjs');
+    const vault = new Vault(TMP);
+    const tp = vault.read('projects', 'test-project.md');
+    assert.ok(tp.includes('- [ ]'));
+
+    const { agenda } = await import('../src/commands/agenda.mjs');
+    const result = agenda(TMP, { all: true });
+    assert.ok(Array.isArray(result.items));
+    assert.ok(result.items.length > 0);
+  });
+
+  it('changelog returns recent changes', async () => {
+    const { changelog } = await import('../src/commands/changelog.mjs');
+    const result = changelog(TMP, { days: 7 });
+    assert.ok(result.changelog.includes('Vault Changelog'));
+    assert.ok(result.dates > 0);
+  });
+
+  it('MCP server exposes all tools (41)', async () => {
     const { McpServer } = await import('../src/mcp-server.mjs');
     const server = new McpServer(TMP);
     const tools = server.handleMessage({
@@ -572,6 +607,9 @@ describe('commands (import)', () => {
     assert.ok(names.includes('relink'));
     assert.ok(names.includes('suggest'));
     assert.ok(names.includes('daily'));
-    assert.ok(tools.result.tools.length >= 36);
+    assert.ok(names.includes('count'));
+    assert.ok(names.includes('agenda'));
+    assert.ok(names.includes('changelog'));
+    assert.ok(tools.result.tools.length >= 38);
   });
 });

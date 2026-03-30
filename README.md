@@ -123,6 +123,12 @@ obsidian-agent relink                  # auto-fix broken links
 obsidian-agent pin "important-note"
 obsidian-agent pin list
 obsidian-agent unpin "important-note"
+
+# Daily dashboard
+obsidian-agent daily
+
+# Improvement suggestions
+obsidian-agent suggest
 ```
 
 ## Vault Structure
@@ -229,6 +235,8 @@ related: ["[[other-note]]", "[[another-note]]"]
 | `unpin <note>` | Unpin a note |
 | `pin list` | Show all pinned notes |
 | `relink` | Fix broken links with closest matches (`--dry-run`) |
+| `suggest` | Actionable vault improvement suggestions (orphans, stale notes, tag consolidation) |
+| `daily` | Daily dashboard (journal status, activity, pinned, projects) |
 | `health` | Vault health scoring (completeness, connectivity, freshness, organization) |
 | `setup [vault-path]` | Install MCP server + `/obsidian` skill for Claude Code |
 | `watch` | Auto-rebuild indices on file changes |
@@ -347,7 +355,7 @@ Run as an [MCP](https://modelcontextprotocol.io/) server for AI assistants (Clau
 }
 ```
 
-Exposes 36 tools: journal, note, capture, search, list, read, recent, delete, backlinks, update, archive, patch, stats, orphans, graph, health, sync, tag_list, tag_rename, rename, move, merge, duplicates, broken_links, batch_update, batch_tag, batch_archive, export.
+Exposes 38 tools: journal, note, capture, search, list, read, recent, delete, backlinks, update, archive, patch, stats, orphans, graph, health, sync, tag_list, tag_rename, rename, move, merge, duplicates, broken_links, batch_update, batch_tag, batch_archive, export.
 
 ## Vault Health
 

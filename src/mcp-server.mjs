@@ -54,6 +54,9 @@ const TOOLS = [
   { name: 'relink', description: 'Fix broken links with closest matches', inputSchema: { type: 'object', properties: { dry_run: { type: 'boolean', description: 'Preview only' } } } },
   { name: 'suggest', description: 'Actionable vault improvement suggestions', inputSchema: { type: 'object', properties: { limit: { type: 'number', description: 'Max suggestions (default: 10)' } } } },
   { name: 'daily', description: 'Daily dashboard (journal status, activity, pinned, projects)', inputSchema: { type: 'object', properties: {} } },
+  { name: 'count', description: 'Word/line/note count statistics', inputSchema: { type: 'object', properties: { type: { type: 'string', description: 'Filter by note type' } } } },
+  { name: 'agenda', description: 'Pending TODO items from journals and projects', inputSchema: { type: 'object', properties: { days: { type: 'number', description: 'Days to scan (default: 7)' }, all: { type: 'boolean', description: 'Scan all notes, not just recent' } } } },
+  { name: 'changelog', description: 'Generate vault changelog from recent activity', inputSchema: { type: 'object', properties: { days: { type: 'number', description: 'Days (default: 7)' } } } },
 ];
 
 // ── Dispatch table ───────────────────────────────────
@@ -98,6 +101,9 @@ const DISPATCH = {
   async relink(root, a) { const { relink } = await import('./commands/relink.mjs'); return relink(root, { dryRun: a.dry_run }); },
   async suggest(root, a) { const { suggest } = await import('./commands/suggest.mjs'); return suggest(root, { limit: a.limit }); },
   async daily(root) { const { daily } = await import('./commands/daily.mjs'); return daily(root); },
+  async count(root, a) { const { count } = await import('./commands/count.mjs'); return count(root, { type: a.type }); },
+  async agenda(root, a) { const { agenda } = await import('./commands/agenda.mjs'); return agenda(root, { days: a.days, all: a.all }); },
+  async changelog(root, a) { const { changelog } = await import('./commands/changelog.mjs'); return changelog(root, { days: a.days }); },
 };
 
 // ── Server class ─────────────────────────────────────

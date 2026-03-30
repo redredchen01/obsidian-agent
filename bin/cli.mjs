@@ -351,6 +351,30 @@ async function main() {
       break;
     }
 
+    case 'count': {
+      const { count } = await import('../src/commands/count.mjs');
+      result = count(resolveVault(flags), { type: flags.type });
+      break;
+    }
+
+    case 'agenda': {
+      const { agenda } = await import('../src/commands/agenda.mjs');
+      result = agenda(resolveVault(flags), {
+        days: flags.days ? parseInt(flags.days) : undefined,
+        all: flags.all === true,
+      });
+      break;
+    }
+
+    case 'changelog': {
+      const { changelog } = await import('../src/commands/changelog.mjs');
+      result = changelog(resolveVault(flags), {
+        days: flags.days ? parseInt(flags.days) : undefined,
+        output: positional[0],
+      });
+      break;
+    }
+
     // ── existing utility commands ────────────────────
 
     case 'setup': {
@@ -461,6 +485,9 @@ Commands:
   relink                   Fix broken links with closest matches
   suggest                  Actionable vault improvement suggestions
   daily                    Daily dashboard (journal, activity, pinned)
+  count                    Word/line/note count statistics
+  agenda                   Pending TODO items from journals & projects
+  changelog [output]       Generate vault changelog from recent activity
 
   setup [vault-path]       Install MCP server + skill
   watch                    Auto-rebuild indices on file changes
@@ -493,6 +520,7 @@ Flags:
         'watch','health','setup','serve','hook','version','help',
         'rename','move','merge','duplicates','broken-links','batch','export','import',
         'link','timeline','validate','pin','unpin','relink','suggest','daily',
+        'count','agenda','changelog',
       ];
       const similar = cmds.filter(c => c.startsWith(command?.slice(0, 2) || '') || levenshtein(c, command) <= 2);
       console.error(`Unknown command: ${command}`);
