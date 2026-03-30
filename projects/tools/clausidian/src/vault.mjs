@@ -3,7 +3,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'fs';
 import { resolve, join, dirname } from 'path';
-import { buildTagIDF } from './scoring.mjs';
+import { SimilarityEngine } from './similarity-engine.mjs';
 
 const DEFAULT_DIRS = ['areas', 'projects', 'resources', 'journal', 'ideas'];
 
@@ -249,38 +249,9 @@ export class Vault {
 
   // ── Find related notes (TF-IDF weighted) ────────────
 
-  findRelated(title, tags = []) {
-    const notes = this.scanNotes({ includeBody: true });
-    const nonJournal = notes.filter(n => n.type !== 'journal');
-
-    // Build tag IDF weights
-    const tagIDF = buildTagIDF(notes, 'journal');
-
-    const titleWords = title.toLowerCase().split(/[\s-]+/).filter(w => w.length > 2);
-
-    return nonJournal
-      .map(n => {
-        let score = 0;
-        const nText = `${n.title} ${n.summary} ${n.body || ''}`.toLowerCase();
-
-        // Title keyword matches (+1 each, +3 for exact title substring)
-        for (const w of titleWords) {
-          const re = new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-          if (re.test(nText)) score += 1;
-        }
-        if (nText.includes(title.toLowerCase())) score += 3;
-
-        // TF-IDF weighted tag matches (rare tags = higher score)
-        for (const t of tags) {
-          if (n.tags.includes(t)) score += tagIDF[t] || 2;
-        }
-
-        const { body, ...rest } = n;
-        return { ...rest, score: Math.round(score * 10) / 10 };
-      })
-      .filter(n => n.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
+  findRelated(title, tags = [], maxResults = 5) {
+    const engine = new SimilarityEngine(this, { includeBody: true });
+    return engine.findRelated(title, tags, maxResults);
   }
 
   // ── Find note by name (fuzzy) ───────────────────────

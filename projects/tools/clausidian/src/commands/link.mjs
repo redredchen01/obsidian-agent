@@ -1,74 +1,25 @@
 /**
  * link — find and create missing links using TF-IDF weighted scoring
  *
- * Combines tag IDF weights + keyword co-occurrence to find the highest
- * value unlinked pairs, then creates bidirectional related links.
+ * Uses SimilarityEngine to find highest-value unlinked pairs,
+ * then creates bidirectional related links.
  */
 import { Vault } from '../vault.mjs';
 import { IndexManager } from '../index-manager.mjs';
+import { SimilarityEngine } from '../similarity-engine.mjs';
 import { todayStr } from '../dates.mjs';
-import { buildTagIDF, extractKeywords, calculateKeywordOverlap } from '../scoring.mjs';
 
 function scorePairs(notes) {
-  const nonJournal = notes.filter(n => n.type !== 'journal');
+  const engine = new SimilarityEngine(null, { includeBody: true, maxResults: 1000 });
+  const suggested = engine.scorePairs(notes);
 
-  // TF-IDF for tags
-  const tagIDF = buildTagIDF(notes, 'journal');
-
-  // Keyword sets per note
-  const noteKW = new Map();
-  for (const n of nonJournal) {
-    const text = `${n.title} ${n.summary} ${(n.body || '').slice(0, 500)}`;
-    noteKW.set(n.file, extractKeywords(text));
-  }
-
-  // Existing links (bidirectional)
-  const linked = new Set();
-  for (const n of nonJournal) {
-    for (const rel of n.related) {
-      linked.add(`${n.file}→${rel}`);
-      linked.add(`${rel}→${n.file}`);
-    }
-    // Also check body wikilinks
-    const wl = (n.body || '').match(/\[\[([^\]]+)\]\]/g) || [];
-    for (const w of wl) {
-      const target = w.slice(2, -2);
-      linked.add(`${n.file}→${target}`);
-    }
-  }
-
-  const pairs = [];
-  for (let i = 0; i < nonJournal.length; i++) {
-    for (let j = i + 1; j < nonJournal.length; j++) {
-      const a = nonJournal[i], b = nonJournal[j];
-      if (linked.has(`${a.file}→${b.file}`) || linked.has(`${b.file}→${a.file}`)) continue;
-
-      let score = 0;
-      const shared = [];
-
-      // TF-IDF weighted tag overlap
-      for (const t of a.tags) {
-        if (b.tags.includes(t)) {
-          score += tagIDF[t] || 1;
-          shared.push(t);
-        }
-      }
-
-      // Keyword co-occurrence (capped at +2)
-      score += calculateKeywordOverlap(noteKW.get(a.file), noteKW.get(b.file));
-
-      if (shared.length >= 1 && score >= 1.5) {
-        pairs.push({
-          noteA: { file: a.file, dir: a.dir, type: a.type },
-          noteB: { file: b.file, dir: b.dir, type: b.type },
-          score: Math.round(score * 10) / 10,
-          sharedTags: shared,
-        });
-      }
-    }
-  }
-
-  return pairs.sort((a, b) => b.score - a.score);
+  // Transform to the format used by link command
+  return suggested.map(s => ({
+    noteA: { file: s.a, dir: '', type: '' },
+    noteB: { file: s.b, dir: '', type: '' },
+    score: s.score,
+    sharedTags: s.shared,
+  }));
 }
 
 export function link(vaultRoot, { dryRun = false, threshold = 1.5, top = 10 } = {}) {
