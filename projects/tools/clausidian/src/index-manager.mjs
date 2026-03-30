@@ -2,7 +2,7 @@
  * Index manager — maintains _tags.md, _graph.md, and directory _index.md files
  */
 import { todayStr, prevDate, nextDate } from './dates.mjs';
-import { buildTagIDF, extractKeywords, calculateKeywordOverlap } from './scoring.mjs';
+import { SimilarityEngine } from './similarity-engine.mjs';
 
 export class IndexManager {
   constructor(vault) {
@@ -40,7 +40,7 @@ export class IndexManager {
 
   // ── Rebuild _graph.md (TF-IDF weighted suggestions) ─
 
-  rebuildGraph(notes) {
+  rebuildGraph(notes, options = {}) {
     if (!notes) notes = this.vault.scanNotes({ includeBody: true });
     const today = todayStr();
     // Build note lookup for strength calculation
@@ -68,57 +68,9 @@ export class IndexManager {
       }
     }
 
-    // ── TF-IDF weighted link suggestions ──
-    const nonJournal = notes.filter(n => n.dir !== 'journal' && n.tags.length > 0);
-    const tagIDF = buildTagIDF(notes, 'journal');
-
-    // Build keyword sets per note (title + summary words, 3+ chars)
-    const noteKeywords = new Map();
-    for (const n of nonJournal) {
-      const text = `${n.title} ${n.summary} ${n.body || ''}`;
-      const words = extractKeywords(text);
-      noteKeywords.set(n.file, words);
-    }
-
-    // Existing links (bidirectional)
-    const existingLinks = new Set();
-    for (const n of nonJournal) {
-      for (const rel of n.related) {
-        existingLinks.add(`${n.file}→${rel}`);
-        existingLinks.add(`${rel}→${n.file}`);
-      }
-    }
-
-    // Score all unlinked pairs
-    const suggested = [];
-    for (let i = 0; i < nonJournal.length; i++) {
-      for (let j = i + 1; j < nonJournal.length; j++) {
-        const a = nonJournal[i], b = nonJournal[j];
-        if (existingLinks.has(`${a.file}→${b.file}`)) continue;
-
-        let score = 0;
-        const shared = [];
-
-        // TF-IDF weighted tag overlap
-        for (const t of a.tags) {
-          if (b.tags.includes(t)) {
-            score += tagIDF[t] || 1;
-            shared.push(t);
-          }
-        }
-
-        // Keyword co-occurrence bonus (capped at +2)
-        score += calculateKeywordOverlap(noteKeywords.get(a.file), noteKeywords.get(b.file));
-
-        // Minimum: at least 1 shared tag AND score > threshold
-        if (shared.length >= 1 && score >= 1.5) {
-          suggested.push({ a: a.file, b: b.file, shared, score: Math.round(score * 10) / 10 });
-        }
-      }
-    }
-
-    // Sort by score descending
-    suggested.sort((a, b) => b.score - a.score);
+    // ── TF-IDF weighted link suggestions (using SimilarityEngine) ──
+    const engine = new SimilarityEngine(this.vault, { includeBody: true, maxResults: 25 });
+    const suggested = engine.scorePairs(notes, options);
 
     if (suggested.length) {
       content += `\n## Suggested Links\n\nTF-IDF weighted (rare tags + content overlap score higher):\n\n| Note A | Note B | Score | Shared Tags |\n|--------|--------|-------|-------------|\n`;
