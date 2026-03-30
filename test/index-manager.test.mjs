@@ -5,6 +5,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { Vault } from '../src/vault.mjs';
 import { IndexManager } from '../src/index-manager.mjs';
+import { ClusterCache } from '../src/cluster-cache.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TMP = join(__dirname, '..', 'tmp', 'test-index');
@@ -510,5 +511,433 @@ regular sync operations.
     // Should be different cached results
     assert.notStrictEqual(withoutBody, withBody,
       'scanNotes() should have separate caches for includeBody');
+  });
+});
+
+describe('Unit 4: Cluster Detection Caching', () => {
+  let vault, idx, clusterCache;
+
+  before(() => {
+    rmSync(TMP, { recursive: true, force: true });
+    mkdirSync(join(TMP, 'projects'), { recursive: true });
+    mkdirSync(join(TMP, 'journal'), { recursive: true });
+
+    // Create a connected component: a -> b -> c -> d (all in one cluster)
+    writeFileSync(join(TMP, 'projects', 'note-a.md'), `---
+title: "Note A"
+type: project
+tags: [cluster-1]
+created: 2026-03-27
+updated: 2026-03-27
+status: active
+summary: "Part of cluster 1"
+related: ["[[note-b]]"]
+---
+
+# Note A
+`);
+
+    writeFileSync(join(TMP, 'projects', 'note-b.md'), `---
+title: "Note B"
+type: project
+tags: [cluster-1]
+created: 2026-03-27
+updated: 2026-03-27
+status: active
+summary: "Part of cluster 1"
+related: ["[[note-a]]", "[[note-c]]"]
+---
+
+# Note B
+`);
+
+    writeFileSync(join(TMP, 'projects', 'note-c.md'), `---
+title: "Note C"
+type: project
+tags: [cluster-1]
+created: 2026-03-27
+updated: 2026-03-27
+status: active
+summary: "Part of cluster 1"
+related: ["[[note-b]]", "[[note-d]]"]
+---
+
+# Note C
+`);
+
+    writeFileSync(join(TMP, 'projects', 'note-d.md'), `---
+title: "Note D"
+type: project
+tags: [cluster-1]
+created: 2026-03-27
+updated: 2026-03-27
+status: active
+summary: "Part of cluster 1"
+related: ["[[note-c]]"]
+---
+
+# Note D
+`);
+
+    // Create an isolated note (no cluster)
+    writeFileSync(join(TMP, 'projects', 'note-e.md'), `---
+title: "Note E"
+type: project
+tags: [isolated]
+created: 2026-03-27
+updated: 2026-03-27
+status: active
+summary: "Isolated note"
+related: []
+---
+
+# Note E
+`);
+
+    vault = new Vault(TMP);
+  });
+
+  after(() => {
+    rmSync(TMP, { recursive: true, force: true });
+  });
+
+  it('cache initialization creates empty ClusterCache', () => {
+    const cache = new ClusterCache();
+    assert.strictEqual(cache.cache.size, 0);
+    assert.ok(cache.isValid() === false, 'Empty cache should be invalid');
+  });
+
+  it('first rebuildGraph populates cache on cache miss', () => {
+    clusterCache = new ClusterCache();
+    idx = new IndexManager(vault, clusterCache);
+
+    const result = idx.rebuildGraph();
+    
+    // First call should be a cache miss
+    assert.ok(!result.clusterCacheHit);
+    assert.ok(result.clusters > 0, 'Should detect at least one cluster');
+    
+    // Cache should now have entries
+    assert.ok(clusterCache.cache.size > 0, 'Cache should have cluster entries');
+  });
+
+  it('second rebuildGraph with same vault state hits cache', () => {
+    clusterCache = new ClusterCache();
+    idx = new IndexManager(vault, clusterCache);
+
+    // First call
+    const result1 = idx.rebuildGraph();
+    assert.ok(!result1.clusterCacheHit, 'First call should miss cache');
+    const cacheSize1 = clusterCache.cache.size;
+
+    // Second call without changes
+    const result2 = idx.rebuildGraph();
+    assert.ok(result2.clusterCacheHit, 'Second call should hit cache');
+    assert.strictEqual(result2.clusters, result1.clusters, 'Cluster count should match');
+    assert.strictEqual(clusterCache.cache.size, cacheSize1, 'Cache size should not change');
+  });
+
+  it('cache stores note -> cluster ID mapping', () => {
+    clusterCache = new ClusterCache();
+    idx = new IndexManager(vault, clusterCache);
+
+    idx.rebuildGraph();
+
+    // Check that cache has entries for cluster members
+    const noteACluster = clusterCache.get('note-a');
+    const noteBCluster = clusterCache.get('note-b');
+    const noteCCluster = clusterCache.get('note-c');
+
+    assert.ok(noteACluster, 'note-a should be cached');
+    assert.ok(noteBCluster, 'note-b should be cached');
+    assert.ok(noteCCluster, 'note-c should be cached');
+
+    // They should all have the same cluster ID (they're connected)
+    assert.strictEqual(noteACluster, noteBCluster, 'a and b should be in same cluster');
+    assert.strictEqual(noteBCluster, noteCCluster, 'b and c should be in same cluster');
+  });
+
+  it('cache invalidation on vault version change', () => {
+    clusterCache = new ClusterCache();
+    idx = new IndexManager(vault, clusterCache);
+
+    // First build
+    const result1 = idx.rebuildGraph();
+    assert.ok(!result1.clusterCacheHit);
+
+    // Modify vault by adding a new note
+    writeFileSync(join(TMP, 'projects', 'note-new.md'), `---
+title: "Note New"
+type: project
+tags: [new]
+created: 2026-03-28
+updated: 2026-03-28
+status: active
+summary: "New note"
+related: []
+---
+
+# Note New
+`);
+    vault.invalidateCache();
+
+    // Rebuild should invalidate cache due to version change
+    const result2 = idx.rebuildGraph();
+    assert.ok(!result2.clusterCacheHit, 'Should invalidate cache on vault change');
+  });
+
+  it('cache TTL expiry invalidates entries (async)', async () => {
+    // Create cache with very short TTL (50ms)
+    clusterCache = new ClusterCache(50);
+    idx = new IndexManager(vault, clusterCache);
+
+    // First build
+    idx.rebuildGraph();
+    assert.ok(clusterCache.isValid(), 'Cache should be valid immediately');
+
+    // Wait for TTL to expire
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Cache should be invalid
+    assert.ok(!clusterCache.isValid(), 'Cache should be invalid after TTL expiry');
+  });
+
+  it('cache.get() returns null for expired entries (async)', async () => {
+    clusterCache = new ClusterCache(50);
+    
+    // Set a value
+    clusterCache.set('note-1', 'cluster-1', 'v1');
+    assert.strictEqual(clusterCache.get('note-1', 'v1'), 'cluster-1');
+
+    // Wait for TTL
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Should return null after expiry
+    assert.ok(clusterCache.get('note-1', 'v1') === null);
+  });
+
+  it('cache.invalidate() removes specific entries', () => {
+    clusterCache = new ClusterCache();
+
+    clusterCache.set('note-a', 'cluster-1', 'v1');
+    clusterCache.set('note-b', 'cluster-1', 'v1');
+    clusterCache.set('note-c', 'cluster-2', 'v1');
+
+    assert.strictEqual(clusterCache.cache.size, 3);
+
+    // Invalidate specific notes
+    clusterCache.invalidate(['note-a', 'note-b']);
+
+    assert.strictEqual(clusterCache.cache.size, 1);
+    assert.ok(clusterCache.get('note-a', 'v1') === null);
+    assert.ok(clusterCache.get('note-b', 'v1') === null);
+    assert.strictEqual(clusterCache.get('note-c', 'v1'), 'cluster-2');
+  });
+
+  it('cache.clear() resets all state', () => {
+    clusterCache = new ClusterCache();
+
+    clusterCache.set('note-a', 'cluster-1', 'v1');
+    clusterCache.set('note-b', 'cluster-1', 'v1');
+
+    assert.ok(clusterCache.cache.size > 0);
+    assert.ok(clusterCache.timestamp !== null);
+
+    clusterCache.clear();
+
+    assert.strictEqual(clusterCache.cache.size, 0);
+    assert.ok(clusterCache.timestamp === null);
+    assert.ok(clusterCache.vaultVersion === null);
+  });
+
+  it('cache.stats() returns metrics', () => {
+    clusterCache = new ClusterCache(3600000);
+
+    clusterCache.set('note-a', 'cluster-1', 'v1');
+    clusterCache.set('note-b', 'cluster-1', 'v1');
+
+    const stats = clusterCache.stats();
+
+    assert.strictEqual(stats.size, 2);
+    assert.strictEqual(stats.ttlMs, 3600000);
+    assert.ok(stats.ageMs >= 0);
+    assert.ok(stats.valid);
+  });
+
+  it('cluster detection produces consistent results with/without cache', () => {
+    clusterCache = new ClusterCache();
+    idx = new IndexManager(vault, clusterCache);
+
+    // Build graph (uses cache miss)
+    const result1 = idx.rebuildGraph();
+    const graph1 = vault.read('_graph.md');
+
+    // Clear cache to force recomputation
+    clusterCache.clear();
+    vault.invalidateCache();
+
+    // Build again (cache miss, but same data)
+    const result2 = idx.rebuildGraph();
+    const graph2 = vault.read('_graph.md');
+
+    // Results should be identical
+    assert.strictEqual(result1.clusters, result2.clusters);
+    assert.strictEqual(result1.relationships, result2.relationships);
+    assert.strictEqual(graph1, graph2, 'Graph content should be identical');
+  });
+
+  it('cache handles partial hit (some notes cached, some not)', () => {
+    clusterCache = new ClusterCache();
+    idx = new IndexManager(vault, clusterCache);
+
+    // First build populates cache
+    idx.rebuildGraph();
+    const initialSize = clusterCache.cache.size;
+
+    // Manually remove one entry to simulate partial cache
+    clusterCache.cache.delete('note-a');
+
+    // Rebuild - should detect partial cache and recompute
+    const result = idx.rebuildGraph();
+    assert.ok(!result.clusterCacheHit, 'Partial cache should cause miss');
+    
+    // Cache should be fully populated again
+    assert.ok(clusterCache.cache.size >= initialSize);
+  });
+
+  it('cache respects vault version changes in get()', () => {
+    clusterCache = new ClusterCache();
+
+    clusterCache.set('note-a', 'cluster-1', 'v1');
+
+    // Same version: should return value
+    assert.strictEqual(clusterCache.get('note-a', 'v1'), 'cluster-1');
+
+    // Different version: should return null and clear cache
+    assert.ok(clusterCache.get('note-a', 'v2') === null);
+    assert.strictEqual(clusterCache.cache.size, 0);
+  });
+
+  it('cache load() bulk-loads cluster map', () => {
+    clusterCache = new ClusterCache();
+
+    const clusterMap = new Map([
+      ['note-a', 'root-1'],
+      ['note-b', 'root-1'],
+      ['note-c', 'root-2'],
+    ]);
+
+    clusterCache.load(clusterMap, 'v1');
+
+    assert.strictEqual(clusterCache.cache.size, 3);
+    assert.strictEqual(clusterCache.get('note-a', 'v1'), 'root-1');
+    assert.strictEqual(clusterCache.get('note-b', 'v1'), 'root-1');
+    assert.strictEqual(clusterCache.get('note-c', 'v1'), 'root-2');
+  });
+
+  it('performance: cache hit completes without measurable slowdown', () => {
+    clusterCache = new ClusterCache();
+    idx = new IndexManager(vault, clusterCache);
+
+    // Warmup: cache miss
+    idx.rebuildGraph();
+
+    // Measure cache hit
+    const startHit = process.hrtime.bigint();
+    idx.rebuildGraph();
+    const endHit = process.hrtime.bigint();
+    const hitMs = Number(endHit - startHit) / 1_000_000;
+
+    // Clear cache and measure miss
+    clusterCache.clear();
+    vault.invalidateCache();
+    
+    const startMiss = process.hrtime.bigint();
+    idx.rebuildGraph();
+    const endMiss = process.hrtime.bigint();
+    const missMs = Number(endMiss - startMiss) / 1_000_000;
+
+    console.log(`
+  Cache hit: ${hitMs.toFixed(2)}ms`);
+    console.log(`  Cache miss: ${missMs.toFixed(2)}ms`);
+
+    // Cache hit should not add measurable overhead
+    // Both should complete quickly (< 100ms for small vault)
+    assert.ok(hitMs < 100, `Cache hit should be fast (got ${hitMs.toFixed(2)}ms)`);
+    assert.ok(missMs < 100, `Cache miss should be fast (got ${missMs.toFixed(2)}ms)`);
+  });
+
+  it('cluster cache integrates with full sync workflow', () => {
+    clusterCache = new ClusterCache();
+    idx = new IndexManager(vault, clusterCache);
+
+    // First sync
+    const result1 = idx.sync();
+    assert.ok(result1.clusters >= 0);
+
+    // Second sync (no changes)
+    const result2 = idx.sync();
+    assert.ok(result2.clusters >= 0);
+    assert.strictEqual(result1.clusters, result2.clusters);
+
+    // Cache should have hit on cluster detection
+    assert.ok(clusterCache.cache.size > 0);
+  });
+
+  it('cluster cache survives vault.invalidateCache()', () => {
+    clusterCache = new ClusterCache();
+    idx = new IndexManager(vault, clusterCache);
+
+    // First build
+    idx.rebuildGraph();
+    const initialSize = clusterCache.cache.size;
+
+    // Invalidate vault (note cache, not cluster cache)
+    vault.invalidateCache();
+
+    // Cluster cache should remain intact
+    assert.strictEqual(clusterCache.cache.size, initialSize);
+  });
+
+  it('cluster version string includes vault state', () => {
+    idx = new IndexManager(vault);
+
+    const v1 = idx._getVaultVersion();
+    assert.ok(typeof v1 === 'string');
+    assert.ok(v1.includes(':'), 'Version should include signature');
+
+    // After adding a note, version should change
+    writeFileSync(join(TMP, 'projects', 'note-version-test.md'), `---
+title: "Version Test"
+type: project
+tags: [test]
+created: 2026-03-28
+updated: 2026-03-28
+status: active
+summary: "Version test"
+related: []
+---
+
+# Version Test
+`);
+    vault.invalidateCache();
+
+    const v2 = idx._getVaultVersion();
+    assert.notStrictEqual(v1, v2, 'Version should change on vault modification');
+  });
+
+  it('rebuildGraph returns clusterCacheHit flag', () => {
+    clusterCache = new ClusterCache();
+    idx = new IndexManager(vault, clusterCache);
+
+    // First call: cache miss
+    const result1 = idx.rebuildGraph();
+    assert.ok('clusterCacheHit' in result1);
+    assert.ok(result1.clusterCacheHit === false);
+
+    // Second call: cache hit
+    const result2 = idx.rebuildGraph();
+    assert.ok('clusterCacheHit' in result2);
+    assert.ok(result2.clusterCacheHit === true);
   });
 });

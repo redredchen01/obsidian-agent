@@ -3,10 +3,12 @@
  */
 import { todayStr, prevDate, nextDate } from './dates.mjs';
 import { TFIDFIndex } from './tfidf-utils.mjs';
+import { ClusterCache } from './cluster-cache.mjs';
 
 export class IndexManager {
-  constructor(vault) {
+  constructor(vault, clusterCache = null) {
     this.vault = vault;
+    this.clusterCache = clusterCache || new ClusterCache();
   }
 
   // ── Rebuild _tags.md ─────────────────────────────────
@@ -36,6 +38,51 @@ export class IndexManager {
     }
     this.vault.write('_tags.md', content);
     return { tags: Object.keys(tagMap).length, notes: notes.length };
+  }
+
+  /**
+   * Compute vault version hash from current file state.
+   * Used to invalidate cluster cache when vault structure changes.
+   * @returns {string} Simple hash of vault state
+   */
+  _getVaultVersion() {
+    const changes = this.vault.detectChanges();
+    // Create a version string from changes signature
+    const sig = `${changes.total}:${Object.keys(changes).toString()}`;
+    return sig;
+  }
+
+  /**
+   * Detect notes that have had cluster membership changes.
+   * Returns list of note files whose cluster assignment may have changed.
+   * @param {Array} allNotes - All non-journal notes
+   * @returns {Array} Note files to invalidate from cache
+   */
+  _getClusterChangedNotes(allNotes) {
+    const changes = this.vault.detectChanges();
+    const changedNotes = [];
+    
+    // Collect changed note files
+    for (const path of [...changes.created, ...changes.modified, ...changes.deleted]) {
+      // Extract note filename from path (e.g., "projects/note.md" -> "note")
+      const match = path.match(/([^/]+)\.md$/);
+      if (match) {
+        changedNotes.push(match[1]);
+      }
+    }
+    
+    // Also invalidate any notes that have a direct relation to changed notes
+    // since their cluster membership might change
+    const relatedNotes = new Set(changedNotes);
+    for (const note of allNotes) {
+      for (const rel of note.related) {
+        if (changedNotes.includes(rel)) {
+          relatedNotes.add(note.file);
+        }
+      }
+    }
+    
+    return Array.from(relatedNotes);
   }
 
   // ── Rebuild _graph.md (TF-IDF weighted suggestions) ─
@@ -165,8 +212,63 @@ export class IndexManager {
       }
     }
 
-    // ── Cluster detection (Union-Find on related links) ──
+    // ── Cluster detection (Union-Find on related links) with caching ──
     const allNotes = notes.filter(n => n.dir !== 'journal');
+    const vaultVersion = this._getVaultVersion();
+    
+    // Attempt to use cached cluster assignments
+    const useCache = this.clusterCache.isValid(vaultVersion);
+    const noteToCluster = new Map();
+    
+    if (useCache) {
+      // Load cluster assignments from cache
+      for (const note of allNotes) {
+        const cached = this.clusterCache.get(note.file, vaultVersion);
+        if (cached) {
+          noteToCluster.set(note.file, cached);
+        }
+      }
+      
+      // If all notes are cached, we can skip the union-find computation
+      if (noteToCluster.size === allNotes.length) {
+        // Use cached cluster map directly
+        const clusters = {};
+        for (const note of allNotes) {
+          const root = noteToCluster.get(note.file);
+          if (!clusters[root]) clusters[root] = [];
+          clusters[root].push(note.file);
+        }
+        const sortedClusters = Object.values(clusters)
+          .filter(c => c.length >= 2)
+          .sort((a, b) => b.length - a.length);
+
+        if (sortedClusters.length) {
+          content += `\n## Clusters\n\n`;
+          for (let i = 0; i < sortedClusters.length; i++) {
+            const c = sortedClusters[i];
+            // Label by the most-connected node
+            const connCount = {};
+            for (const file of c) {
+              const n = allNotes.find(x => x.file === file);
+              connCount[file] = n ? n.related.length : 0;
+            }
+            const hub = c.sort((a, b) => (connCount[b] || 0) - (connCount[a] || 0))[0];
+            content += `### Cluster ${i + 1}: ${hub} (${c.length} notes)\n`;
+            content += c.map(f => `- [[${f}]]`).join('\n') + '\n\n';
+          }
+        }
+
+        this.vault.write('_graph.md', content);
+        return {
+          relationships: relCount,
+          suggestedLinks: suggested.length,
+          clusters: sortedClusters.length,
+          clusterCacheHit: true,
+        };
+      }
+    }
+    
+    // Cache miss or invalid: perform full union-find computation
     const parent = {};
     const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
     const union = (a, b) => { parent[find(a)] = find(b); };
@@ -178,13 +280,19 @@ export class IndexManager {
       }
     }
 
-    // Group into clusters (min 2 members)
+    // Group into clusters (min 2 members) and update cache
     const clusters = {};
+    const clusterMap = new Map();
     for (const n of allNotes) {
       const root = find(n.file);
       if (!clusters[root]) clusters[root] = [];
       clusters[root].push(n.file);
+      clusterMap.set(n.file, root);
+      
+      // Cache individual cluster assignments
+      this.clusterCache.set(n.file, root, vaultVersion);
     }
+    
     const sortedClusters = Object.values(clusters)
       .filter(c => c.length >= 2)
       .sort((a, b) => b.length - a.length);
@@ -210,6 +318,7 @@ export class IndexManager {
       relationships: relCount,
       suggestedLinks: suggested.length,
       clusters: sortedClusters.length,
+      clusterCacheHit: false,
     };
   }
 
