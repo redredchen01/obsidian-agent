@@ -6,20 +6,12 @@ import { Vault } from '../vault.mjs';
 import { TemplateEngine } from '../templates.mjs';
 import { IndexManager } from '../index-manager.mjs';
 import { todayStr, getWeekDates, getWeekLabel, getMonthRange } from '../dates.mjs';
+import { extractSection, extractAllSections } from '../journal-utils.mjs';
 
 function injectSection(content, heading, data) {
   // Replace the placeholder "-" line after a ## heading with actual data
   const regex = new RegExp(`(## ${heading}\n\n)-(\n|$)`);
   return content.replace(regex, `$1${data}\n`);
-}
-
-function extractSection(content, heading) {
-  const regex = new RegExp(`## ${heading}\\n([\\s\\S]*?)(?=\\n## |\\n---|$)`);
-  const match = content.match(regex);
-  if (!match) return [];
-  return match[1].trim().split('\n')
-    .map(l => l.trim())
-    .filter(l => l.startsWith('- ') && l !== '-' && !l.includes('no activity'));
 }
 
 // A1: Scan journal entries for recurring topics across multiple days
@@ -31,20 +23,10 @@ function generatePromotionSuggestions(vault, dates) {
     const content = vault.read('journal', `${d}.md`);
     if (!content) continue;
 
-    const ideas = [
-      ...extractSection(content, '想法'),
-      ...extractSection(content, 'Ideas'),
-    ];
-    const issues = [
-      ...extractSection(content, '問題與風險'),
-      ...extractSection(content, '问题与风险'),
-      ...extractSection(content, 'Issues'),
-    ];
-    const plans = [
-      ...extractSection(content, '明日計劃'),
-      ...extractSection(content, '明日计划'),
-      ...extractSection(content, 'Tomorrow'),
-    ];
+    const sections = extractAllSections(content);
+    const ideas = sections.ideas;
+    const issues = sections.issues;
+    const plans = sections.plans;
 
     // Track topics from ideas and issues
     for (const item of [...ideas, ...issues]) {
@@ -99,26 +81,11 @@ export function review(vaultRoot, { date } = {}) {
   for (const d of dates) {
     const content = vault.read('journal', `${d}.md`);
     if (!content) continue;
-    // Try both CN and EN section headers
-    allCompleted.push(
-      ...extractSection(content, '今日記錄'),
-      ...extractSection(content, '今日记录'),
-      ...extractSection(content, 'Records'),
-    );
-    allIssues.push(
-      ...extractSection(content, '問題與風險'),
-      ...extractSection(content, '问题与风险'),
-      ...extractSection(content, 'Issues'),
-    );
-    allIdeas.push(
-      ...extractSection(content, '想法'),
-      ...extractSection(content, 'Ideas'),
-    );
-    allPlans.push(
-      ...extractSection(content, '明日計劃'),
-      ...extractSection(content, '明日计划'),
-      ...extractSection(content, 'Tomorrow'),
-    );
+    const sections = extractAllSections(content);
+    allCompleted.push(...sections.records);
+    allIssues.push(...sections.issues);
+    allIdeas.push(...sections.ideas);
+    allPlans.push(...sections.plans);
   }
 
   const unique = arr => [...new Set(arr)];
@@ -277,19 +244,10 @@ export function monthlyReview(vaultRoot, { year, month } = {}) {
       if (d < start || d > end) continue;
       const content = vault.read('journal', file);
       if (!content) continue;
-      allCompleted.push(
-        ...extractSection(content, 'Records'),
-        ...extractSection(content, '今日記錄'),
-        ...extractSection(content, '今日记录'),
-      );
-      allIssues.push(
-        ...extractSection(content, 'Issues'),
-        ...extractSection(content, '問題與風險'),
-      );
-      allIdeas.push(
-        ...extractSection(content, 'Ideas'),
-        ...extractSection(content, '想法'),
-      );
+      const sections = extractAllSections(content);
+      allCompleted.push(...sections.records);
+      allIssues.push(...sections.issues);
+      allIdeas.push(...sections.ideas);
     }
   }
 

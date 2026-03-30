@@ -1,9 +1,9 @@
 /**
  * health — vault health scoring across 4 dimensions
  */
-import { readdirSync, existsSync } from 'fs';
 import { Vault } from '../vault.mjs';
 import { IndexManager } from '../index-manager.mjs';
+import { getRecentJournalText, isMentionedInJournals, stalenessCheck } from '../journal-utils.mjs';
 
 // A2: Scan ideas/ and assign temperature based on recency and journal mentions
 function ideaTemperatures(vault, notes) {
@@ -11,18 +11,7 @@ function ideaTemperatures(vault, notes) {
   const fourteenDaysAgo = new Date(now - 14 * 86400000).toISOString().slice(0, 10);
   const thirtyDaysAgo = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
 
-  // Collect all journal body text from last 30 days for mention scanning
-  const recentJournalText = [];
-  const journalDir = vault.path('journal');
-  if (existsSync(journalDir)) {
-    for (const file of readdirSync(journalDir)) {
-      if (!file.match(/^\d{4}-\d{2}-\d{2}\.md$/)) continue;
-      const d = file.replace('.md', '');
-      if (d < thirtyDaysAgo) continue;
-      const content = vault.read('journal', file);
-      if (content) recentJournalText.push(content.toLowerCase());
-    }
-  }
+  const recentJournalText = getRecentJournalText(vault, 30);
 
   const ideas = notes.filter(n => n.dir === 'ideas');
   const results = [];
@@ -31,9 +20,7 @@ function ideaTemperatures(vault, notes) {
     const created = idea.created || '';
     const updated = idea.updated || '';
     const latestDate = updated || created;
-    const mentioned = recentJournalText.some(t =>
-      t.includes(`[[${idea.file}]]`.toLowerCase()) || t.includes(idea.title.toLowerCase())
-    );
+    const mentioned = isMentionedInJournals(idea, recentJournalText);
 
     let temp, icon;
     if (mentioned) {
@@ -63,46 +50,6 @@ function updateIdeasIndex(vault, temperatures) {
     content += `| [[${t.file}]] | ${t.icon} ${t.temp} | ${t.updated || '-'} |\n`;
   }
   vault.write('ideas/_index.md', content);
-}
-
-// A3: Resource staleness + project/idea archive suggestions
-function stalenessReport(vault, notes) {
-  const now = new Date();
-  const sixtyDaysAgo = new Date(now - 60 * 86400000).toISOString().slice(0, 10);
-  const thirtyDaysAgo = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
-
-  // Collect recent journal text for mention scanning
-  const recentJournalText = [];
-  const journalDir = vault.path('journal');
-  if (existsSync(journalDir)) {
-    for (const file of readdirSync(journalDir)) {
-      if (!file.match(/^\d{4}-\d{2}-\d{2}\.md$/)) continue;
-      const d = file.replace('.md', '');
-      if (d < thirtyDaysAgo) continue;
-      const content = vault.read('journal', file);
-      if (content) recentJournalText.push(content.toLowerCase());
-    }
-  }
-
-  const isMentioned = (note) => recentJournalText.some(t =>
-    t.includes(`[[${note.file}]]`.toLowerCase()) || t.includes(note.title.toLowerCase())
-  );
-
-  const staleResources = notes
-    .filter(n => n.dir === 'resources' && n.updated && n.updated < sixtyDaysAgo)
-    .map(n => ({ file: n.file, updated: n.updated, reason: '60+ days since updated' }));
-
-  const staleProjects = notes
-    .filter(n => n.dir === 'projects' && n.status === 'active' && !isMentioned(n))
-    .filter(n => (n.updated || '') < thirtyDaysAgo)
-    .map(n => ({ file: n.file, updated: n.updated, reason: 'active but 30+ days no mention' }));
-
-  const deadIdeas = notes
-    .filter(n => n.dir === 'ideas' && !isMentioned(n))
-    .filter(n => (n.updated || n.created || '') < thirtyDaysAgo)
-    .map(n => ({ file: n.file, updated: n.updated || n.created, reason: '30+ days, never mentioned' }));
-
-  return { staleResources, staleProjects, deadIdeas };
 }
 
 export function health(vaultRoot) {
@@ -207,7 +154,8 @@ export function health(vaultRoot) {
   }
 
   // A3: Staleness report
-  const staleness = stalenessReport(vault, notes);
+  const journalTexts = getRecentJournalText(vault, 30);
+  const staleness = stalenessCheck(notes, journalTexts);
   const allStale = [...staleness.staleResources, ...staleness.staleProjects, ...staleness.deadIdeas];
   if (allStale.length) {
     console.log(`\n── KB Staleness Report ──`);

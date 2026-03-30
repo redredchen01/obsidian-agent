@@ -4,12 +4,25 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'fs';
 import { resolve, join, dirname } from 'path';
 
+const DEFAULT_DIRS = ['areas', 'projects', 'resources', 'journal', 'ideas'];
+
 export class Vault {
-  constructor(root) {
+  constructor(root, { dirs } = {}) {
     this.root = resolve(root);
-    this.dirs = ['areas', 'projects', 'resources', 'journal', 'ideas'];
+    this.dirs = dirs || this._detectDirs() || DEFAULT_DIRS;
     this._notesCache = null;
     this._notesCacheWithBody = null;
+  }
+
+  _detectDirs() {
+    const configPath = this.path('.obsidian-agent.json');
+    if (existsSync(configPath)) {
+      try {
+        const config = JSON.parse(readFileSync(configPath, 'utf8'));
+        if (Array.isArray(config.dirs)) return config.dirs;
+      } catch { /* ignore */ }
+    }
+    return null;
   }
 
   invalidateCache() {
@@ -82,31 +95,40 @@ export class Vault {
 
     const notes = [];
     for (const dir of this.dirs) {
-      const dirPath = this.path(dir);
-      if (!existsSync(dirPath)) continue;
-      for (const file of readdirSync(dirPath)) {
-        if (!file.endsWith('.md') || file.startsWith('_')) continue;
-        const content = this.read(dir, file);
-        if (!content) continue;
-        const fm = this.parseFrontmatter(content);
-        const note = {
-          file: file.replace('.md', ''),
-          dir,
-          title: fm.title || file.replace('.md', ''),
-          type: fm.type || dir.replace(/s$/, ''),
-          tags: Array.isArray(fm.tags) ? fm.tags : [],
-          status: fm.status || 'active',
-          summary: fm.summary || '',
-          related: Array.isArray(fm.related) ? fm.related : [],
-          created: fm.created || '',
-          updated: fm.updated || '',
-        };
-        if (includeBody) note.body = this.extractBody(content);
-        notes.push(note);
-      }
+      this._scanDir(dir, dir, notes, includeBody);
     }
     this[cacheKey] = notes;
     return notes;
+  }
+
+  _scanDir(dir, topDir, notes, includeBody) {
+    const dirPath = this.path(dir);
+    if (!existsSync(dirPath)) return;
+    for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+      if (entry.isDirectory() && !entry.name.startsWith('.') && !entry.name.startsWith('_')) {
+        this._scanDir(`${dir}/${entry.name}`, topDir, notes, includeBody);
+        continue;
+      }
+      if (!entry.name.endsWith('.md') || entry.name.startsWith('_')) continue;
+      const content = this.read(dir, entry.name);
+      if (!content) continue;
+      const fm = this.parseFrontmatter(content);
+      const note = {
+        file: entry.name.replace('.md', ''),
+        dir: topDir,
+        subdir: dir !== topDir ? dir : undefined,
+        title: fm.title || entry.name.replace('.md', ''),
+        type: fm.type || topDir.replace(/s$/, ''),
+        tags: Array.isArray(fm.tags) ? fm.tags : [],
+        status: fm.status || 'active',
+        summary: fm.summary || '',
+        related: Array.isArray(fm.related) ? fm.related : [],
+        created: fm.created || '',
+        updated: fm.updated || '',
+      };
+      if (includeBody) note.body = this.extractBody(content);
+      notes.push(note);
+    }
   }
 
   // ── Search notes by keyword (relevance-scored) ─────
@@ -210,23 +232,44 @@ export class Vault {
     return { total: notes.length, byType, byStatus, byTag, orphans: orphanCount };
   }
 
-  // ── Find related notes ───────────────────────────────
+  // ── Find related notes (TF-IDF weighted) ────────────
 
   findRelated(title, tags = []) {
-    const notes = this.scanNotes();
+    const notes = this.scanNotes({ includeBody: true });
+    const nonJournal = notes.filter(n => n.type !== 'journal');
+
+    // Build tag IDF weights
+    const tagDF = {};
+    for (const n of nonJournal) {
+      for (const t of n.tags) tagDF[t] = (tagDF[t] || 0) + 1;
+    }
+    const totalNotes = nonJournal.length || 1;
+    const tagIDF = {};
+    for (const [tag, df] of Object.entries(tagDF)) {
+      tagIDF[tag] = Math.log(totalNotes / df);
+    }
+
     const titleWords = title.toLowerCase().split(/[\s-]+/).filter(w => w.length > 2);
-    return notes
+
+    return nonJournal
       .map(n => {
         let score = 0;
-        const nWords = `${n.title} ${n.summary}`.toLowerCase();
+        const nText = `${n.title} ${n.summary} ${n.body || ''}`.toLowerCase();
+
+        // Title keyword matches (+1 each, +3 for exact title substring)
         for (const w of titleWords) {
-          const re = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
-          if (re.test(nWords)) score += 1;
+          const re = new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          if (re.test(nText)) score += 1;
         }
+        if (nText.includes(title.toLowerCase())) score += 3;
+
+        // TF-IDF weighted tag matches (rare tags = higher score)
         for (const t of tags) {
-          if (n.tags.includes(t)) score += 2;
+          if (n.tags.includes(t)) score += tagIDF[t] || 2;
         }
-        return { ...n, score };
+
+        const { body, ...rest } = n;
+        return { ...rest, score: Math.round(score * 10) / 10 };
       })
       .filter(n => n.score > 0)
       .sort((a, b) => b.score - a.score)

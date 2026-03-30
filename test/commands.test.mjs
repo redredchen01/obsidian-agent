@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, rmSync, existsSync, readFileSync } from 'fs';
+import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -636,5 +636,169 @@ describe('commands (import)', () => {
     assert.ok(names.includes('random'));
     assert.ok(names.includes('focus'));
     assert.ok(tools.result.tools.length >= 41);
+  });
+});
+
+// ── Registry tests ─────────────────────────────────────
+
+describe('registry', () => {
+  it('exports all command names', async () => {
+    const { getCommandNames, getCommand } = await import('../src/registry.mjs');
+    const names = getCommandNames();
+    assert.ok(names.length >= 30);
+    assert.ok(names.includes('journal'));
+    assert.ok(names.includes('search'));
+    assert.ok(names.includes('focus'));
+    assert.ok(names.includes('neighbors'));
+    assert.ok(names.includes('batch'));
+    assert.ok(names.includes('tag'));
+  });
+
+  it('getCommand returns command with run()', async () => {
+    const { getCommand } = await import('../src/registry.mjs');
+    const cmd = getCommand('journal');
+    assert.ok(cmd);
+    assert.equal(cmd.name, 'journal');
+    assert.equal(typeof cmd.run, 'function');
+    assert.ok(cmd.mcpSchema);
+  });
+
+  it('getCommand returns undefined for unknown', async () => {
+    const { getCommand } = await import('../src/registry.mjs');
+    assert.equal(getCommand('nonexistent'), undefined);
+  });
+
+  it('getMcpTools generates tool definitions', async () => {
+    const { getMcpTools } = await import('../src/registry.mjs');
+    const tools = getMcpTools();
+    assert.ok(tools.length >= 30);
+    const names = tools.map(t => t.name);
+    assert.ok(names.includes('journal'));
+    assert.ok(names.includes('batch_update'));
+    assert.ok(names.includes('tag_list'));
+    assert.ok(names.includes('pin_list'));
+    for (const tool of tools) {
+      assert.ok(tool.name);
+      assert.ok(tool.description);
+      assert.ok(tool.inputSchema);
+      assert.equal(tool.inputSchema.type, 'object');
+    }
+  });
+
+  it('getMcpDispatch generates handlers', async () => {
+    const { getMcpDispatch } = await import('../src/registry.mjs');
+    const dispatch = getMcpDispatch();
+    assert.ok(Object.keys(dispatch).length >= 30);
+    assert.equal(typeof dispatch.journal, 'function');
+    assert.equal(typeof dispatch.batch_update, 'function');
+    assert.equal(typeof dispatch.tag_list, 'function');
+  });
+});
+
+// ── Journal utils tests ────────────────────────────────
+
+describe('journal-utils', () => {
+  const JUTMP = join(__dirname, '..', 'tmp', 'test-journal-utils');
+
+  before(() => {
+    rmSync(JUTMP, { recursive: true, force: true });
+    mkdirSync(join(JUTMP, 'journal'), { recursive: true });
+    mkdirSync(join(JUTMP, 'ideas'), { recursive: true });
+    mkdirSync(join(JUTMP, 'projects'), { recursive: true });
+
+    const today = new Date().toISOString().slice(0, 10);
+    writeFileSync(join(JUTMP, 'journal', `${today}.md`), `---
+title: "${today}"
+type: journal
+---
+
+## Records
+- did something cool
+- fixed a bug
+
+## Ideas
+- new feature idea
+- another thought
+
+## Issues
+- performance problem
+
+## Tomorrow
+- [ ] finish task
+`);
+
+    writeFileSync(join(JUTMP, 'ideas', 'cool-idea.md'), `---
+title: "Cool Idea"
+type: idea
+tags: [ai, tools]
+created: ${today}
+updated: ${today}
+summary: "A cool idea"
+---
+
+Some idea content mentioning [[other-note]]
+`);
+  });
+
+  after(() => {
+    rmSync(JUTMP, { recursive: true, force: true });
+  });
+
+  it('extractSection pulls bullet items', async () => {
+    const { extractSection } = await import('../src/journal-utils.mjs');
+    const content = `## Records\n- item one\n- item two\n\n## Next`;
+    const items = extractSection(content, 'Records');
+    assert.equal(items.length, 2);
+    assert.ok(items[0].includes('item one'));
+  });
+
+  it('extractSection returns empty for missing heading', async () => {
+    const { extractSection } = await import('../src/journal-utils.mjs');
+    const items = extractSection('no headings here', 'Missing');
+    assert.equal(items.length, 0);
+  });
+
+  it('extractAllSections handles CN+EN headings', async () => {
+    const { extractAllSections } = await import('../src/journal-utils.mjs');
+    const content = `## 今日記錄\n- did work\n\n## 想法\n- idea one\n\n## Issues\n- bug found`;
+    const sections = extractAllSections(content);
+    assert.ok(sections.records.length >= 1);
+    assert.ok(sections.ideas.length >= 1);
+    assert.ok(sections.issues.length >= 1);
+  });
+
+  it('getRecentJournalText returns lowercase content', async () => {
+    const { Vault } = await import('../src/vault.mjs');
+    const { getRecentJournalText } = await import('../src/journal-utils.mjs');
+    const vault = new Vault(JUTMP);
+    const texts = getRecentJournalText(vault, 7);
+    assert.ok(texts.length >= 1);
+    assert.ok(texts[0].includes('did something cool'));
+    // Should be lowercase
+    assert.equal(texts[0], texts[0].toLowerCase());
+  });
+
+  it('isMentionedInJournals detects mentions', async () => {
+    const { Vault } = await import('../src/vault.mjs');
+    const { getRecentJournalText, isMentionedInJournals } = await import('../src/journal-utils.mjs');
+    const vault = new Vault(JUTMP);
+    const texts = getRecentJournalText(vault, 7);
+    // "cool idea" title should NOT be in journal text (it's not mentioned there)
+    assert.equal(isMentionedInJournals({ file: 'cool-idea', title: 'Cool Idea' }, texts), false);
+    // Something that IS in the journal
+    assert.equal(isMentionedInJournals({ file: 'nonexistent', title: 'did something cool' }, texts), true);
+  });
+
+  it('stalenessCheck returns structured report', async () => {
+    const { Vault } = await import('../src/vault.mjs');
+    const { getRecentJournalText, stalenessCheck } = await import('../src/journal-utils.mjs');
+    const vault = new Vault(JUTMP);
+    const notes = vault.scanNotes();
+    const texts = getRecentJournalText(vault, 30);
+    const report = stalenessCheck(notes, texts);
+    assert.ok('staleResources' in report);
+    assert.ok('staleProjects' in report);
+    assert.ok('deadIdeas' in report);
+    assert.ok(Array.isArray(report.staleResources));
   });
 });
