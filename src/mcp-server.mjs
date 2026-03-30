@@ -209,6 +209,27 @@ const TOOLS = [
       required: ['old_tag', 'new_tag'],
     },
   },
+  {
+    name: 'open',
+    description: 'Open a note in Obsidian.app (macOS) via obsidian:// URI',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        note: { type: 'string', description: 'Note filename (optional — opens vault if omitted)' },
+        reveal: { type: 'boolean', description: 'Reveal in Finder instead of opening in Obsidian' },
+      },
+    },
+  },
+  {
+    name: 'quicknote',
+    description: 'Capture clipboard contents as an idea note (macOS/Linux/Windows)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prefix: { type: 'string', description: 'Optional prefix text to prepend' },
+      },
+    },
+  },
 ];
 
 export class McpServer {
@@ -323,6 +344,14 @@ export class McpServer {
         case 'tag_rename': {
           const { tagRename } = await import('./commands/tag.mjs');
           return tagRename(this.vaultRoot, args.old_tag, args.new_tag);
+        }
+        case 'open': {
+          const { open } = await import('./commands/open.mjs');
+          return open(this.vaultRoot, args.note, { reveal: args.reveal });
+        }
+        case 'quicknote': {
+          const { quicknote } = await import('./commands/quicknote.mjs');
+          return quicknote(this.vaultRoot, { prefix: args.prefix || '' });
         }
         default:
           throw new Error(`Unknown tool: ${name}`);

@@ -1,17 +1,37 @@
 /**
  * hook — event handlers for agent hooks (session-stop, daily-backfill, weekly-review)
  */
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { execSync } from 'child_process';
-import { dirname } from 'path';
+import { dirname, join, basename, sep } from 'path';
 import { Vault } from '../vault.mjs';
 import { TemplateEngine } from '../templates.mjs';
 import { IndexManager } from '../index-manager.mjs';
-import { todayStr, weekdayShort, prevDate, nextDate } from '../dates.mjs';
+import { todayStr, isValidDate, weekdayShort, prevDate, nextDate } from '../dates.mjs';
+import { notify } from '../notify.mjs';
 
 function run(cmd) {
   try { return execSync(cmd, { encoding: 'utf8', timeout: 30000 }).trim(); }
   catch { return ''; }
+}
+
+// ── Cross-platform recursive .git directory scanner ──
+
+function findGitDirs(root, maxDepth = 5, depth = 0) {
+  if (depth > maxDepth) return [];
+  const dirs = [];
+  let entries;
+  try { entries = readdirSync(root, { withFileTypes: true }); } catch { return []; }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const full = join(root, entry.name);
+    if (entry.name === '.git') {
+      dirs.push(full);
+    } else if (entry.name !== 'node_modules' && !entry.name.startsWith('.')) {
+      dirs.push(...findGitDirs(full, maxDepth, depth + 1));
+    }
+  }
+  return dirs;
 }
 
 // ── Collect git commits for a date across all repos in a directory ──
@@ -19,14 +39,14 @@ function run(cmd) {
 function getGitCommits(scanRoot, date) {
   const since = `${date}T00:00:00`;
   const until = `${nextDate(date)}T00:00:00`;
-  const gitDirs = run(`find "${scanRoot}" -maxdepth 5 -name ".git" -type d 2>/dev/null`);
-  if (!gitDirs) return [];
+  const gitDirs = findGitDirs(scanRoot);
+  if (!gitDirs.length) return [];
 
   const commits = [];
-  for (const gitDir of gitDirs.split('\n').filter(Boolean)) {
+  for (const gitDir of gitDirs) {
     const repo = dirname(gitDir);
-    const repoName = repo.split('/').pop();
-    const log = run(`git -C "${repo}" log --oneline --since="${since}" --until="${until}" --all 2>/dev/null`);
+    const repoName = basename(repo);
+    const log = run(`git -C "${repo}" log --oneline --since="${since}" --until="${until}" --all`);
     if (log) {
       for (const line of log.split('\n').filter(Boolean)) {
         commits.push({ repo: repoName, message: line.replace(/^[a-f0-9]+ /, '') });
@@ -44,9 +64,9 @@ export function sessionStop(vaultRoot, { scanRoot } = {}) {
   const idx = new IndexManager(vault);
   const date = todayStr();
 
-  // Read stdin (agent hook payload)
+  // Read stdin (agent hook payload) — fd 0 works cross-platform
   let stdin = '';
-  try { stdin = readFileSync('/dev/stdin', 'utf8'); } catch {}
+  try { stdin = readFileSync(0, 'utf8'); } catch {}
   let hookData = {};
   try { hookData = JSON.parse(stdin); } catch {}
 
@@ -64,6 +84,7 @@ export function sessionStop(vaultRoot, { scanRoot } = {}) {
     const appendLine = `\n- [${timestamp}] ${sessionNote}`;
     const updated = existing.replace(/## (今日[記记]錄|Records)\n/, `## $1\n${appendLine}\n`);
     vault.write('journal', `${date}.md`, updated);
+    notify('obsidian-agent', `Session logged → journal/${date}.md`);
     console.log(JSON.stringify({ status: 'appended', date }));
   } else {
     const root = scanRoot || dirname(vaultRoot);
@@ -81,6 +102,7 @@ export function sessionStop(vaultRoot, { scanRoot } = {}) {
 
     vault.write('journal', `${date}.md`, content);
     idx.updateDirIndex('journal', date, summary);
+    notify('obsidian-agent', `Journal created → ${date}.md`);
     console.log(JSON.stringify({ status: 'created', date }));
   }
 }
@@ -92,6 +114,9 @@ export function dailyBackfill(vaultRoot, { date, scanRoot, force } = {}) {
   const tpl = new TemplateEngine(vaultRoot);
   const idx = new IndexManager(vault);
   const d = date || todayStr();
+  if (date && !isValidDate(date)) {
+    throw new Error(`Invalid date: ${date}. Expected YYYY-MM-DD format.`);
+  }
 
   if (vault.exists('journal', `${d}.md`) && !force) {
     console.log(JSON.stringify({ status: 'skip', date: d, reason: 'already exists' }));
@@ -134,5 +159,6 @@ export function dailyBackfill(vaultRoot, { date, scanRoot, force } = {}) {
   idx.updateDirIndex('journal', d, summary);
   idx.sync();
 
+  notify('obsidian-agent', `Backfill ${d}: ${commits.length} commits`);
   console.log(JSON.stringify({ status: 'created', date: d, commits: commits.length }));
 }

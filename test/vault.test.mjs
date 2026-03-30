@@ -1,7 +1,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, sep } from 'path';
 import { fileURLToPath } from 'url';
 import { Vault } from '../src/vault.mjs';
 
@@ -52,7 +52,9 @@ related: []
   });
 
   it('path resolves correctly', () => {
-    assert.ok(vault.path('projects', 'build-api.md').endsWith('projects/build-api.md'));
+    const p = vault.path('projects', 'build-api.md');
+    // Works on both Unix (/) and Windows (\)
+    assert.ok(p.endsWith(join('projects', 'build-api.md')));
   });
 
   it('exists checks files', () => {

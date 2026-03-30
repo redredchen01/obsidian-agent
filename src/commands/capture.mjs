@@ -13,7 +13,8 @@ export function capture(vaultRoot, ideaText) {
 
   // Extract title: first sentence or first 50 chars
   const title = ideaText.split(/[。.!！?\n]/)[0].trim().slice(0, 60) || 'Untitled idea';
-  const filename = title.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-').replace(/(^-|-$)/g, '');
+  let filename = title.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-').replace(/(^-|-$)/g, '');
+  if (!filename) filename = `idea-${Date.now()}`;
 
   if (vault.exists('ideas', `${filename}.md`)) {
     console.log(`Idea already exists: ideas/${filename}.md`);

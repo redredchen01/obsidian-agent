@@ -255,6 +255,36 @@ async function main() {
       return; // Don't exit — server runs indefinitely
     }
 
+    case 'open': {
+      const { open } = await import('../src/commands/open.mjs');
+      result = open(resolveVault(flags), positional[0], { reveal: flags.reveal === true });
+      break;
+    }
+
+    case 'quicknote': {
+      const { quicknote } = await import('../src/commands/quicknote.mjs');
+      result = quicknote(resolveVault(flags), { prefix: positional.join(' ') });
+      break;
+    }
+
+    case 'launchd': {
+      const subcmd = positional[0];
+      if (subcmd === 'install') {
+        const { launchdInstall } = await import('../src/commands/launchd.mjs');
+        result = launchdInstall(positional[1] || resolveVault(flags), { scanRoot: flags['scan-root'] });
+      } else if (subcmd === 'uninstall') {
+        const { launchdUninstall } = await import('../src/commands/launchd.mjs');
+        result = launchdUninstall();
+      } else if (subcmd === 'status') {
+        const { launchdStatus } = await import('../src/commands/launchd.mjs');
+        result = launchdStatus();
+      } else {
+        console.error('Usage: obsidian-agent launchd <install|uninstall|status>');
+        process.exit(1);
+      }
+      break;
+    }
+
     case 'hook': {
       const event = positional[0];
       const vaultRoot = resolveVault(flags);
@@ -317,6 +347,9 @@ Commands:
   patch <note>             Edit a section by heading
   tag list                 List all tags with counts
   tag rename <old> <new>   Rename a tag across the vault
+  open [note]              Open note in Obsidian.app (macOS)
+  quicknote [prefix]       Capture clipboard as idea note
+  launchd <sub>            Install/uninstall/status LaunchAgents (macOS)
   setup [vault-path]       Install MCP server + /obsidian skill for Claude Code
   watch                    Auto-rebuild indices on file changes
   health                   Vault health scoring report
@@ -335,6 +368,8 @@ Flags:
   --summary <text>         Set note summary
   --tags <a,b,c>           Set tags
   --json                   Output as JSON (machine-readable)
+  --copy                   Copy result to clipboard (macOS/Linux/Windows)
+  --reveal                 Reveal in Finder instead of opening (for open)
   --heading <name>         Target heading (for patch)
   --append <text>          Append to section (for patch)
   --prepend <text>         Prepend to section (for patch)
@@ -361,7 +396,7 @@ Examples:
     }
 
     default: {
-      const cmds = ['init','journal','note','capture','search','list','review','sync','read','delete','recent','backlinks','update','archive','stats','graph','orphans','patch','tag','watch','health','setup','serve','hook','version','help'];
+      const cmds = ['init','journal','note','capture','search','list','review','sync','read','delete','recent','backlinks','update','archive','stats','graph','orphans','patch','tag','open','quicknote','launchd','watch','health','setup','serve','hook','version','help'];
       const similar = cmds.filter(c => c.startsWith(command?.slice(0, 2) || '') || levenshtein(c, command) <= 2);
       console.error(`Unknown command: ${command}`);
       if (similar.length) console.error(`Did you mean: ${similar.join(', ')}?`);
@@ -374,6 +409,19 @@ Examples:
   if (jsonMode && result !== undefined) {
     console.log = origLog;
     console.log(JSON.stringify(result, null, 2));
+  }
+
+  // --copy: send result to clipboard
+  if (flags.copy === true && result !== undefined) {
+    const { copyToClipboard } = await import('../src/clipboard.mjs');
+    let text;
+    if (result.mermaid) text = result.mermaid;
+    else if (result.content) text = result.content;
+    else if (result.results) text = result.results.map(r => `[[${r.file}]] — ${r.summary || r.title || ''}`).join('\n');
+    else text = JSON.stringify(result, null, 2);
+    if (copyToClipboard(text)) {
+      if (!jsonMode) console.log('(Copied to clipboard)');
+    }
   }
 }
 
