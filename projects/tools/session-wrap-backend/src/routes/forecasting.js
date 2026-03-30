@@ -4,9 +4,26 @@
 
 const express = require('express')
 const { pool } = require('../db/init')
+const { authenticateToken } = require('../middleware/auth')
+const { checkRole } = require('../middleware/authorization')
 const ForecastEngine = require('../utils/forecast')
 
 const router = express.Router()
+
+router.use(authenticateToken)
+router.use(checkRole(['admin', 'editor', 'viewer']))
+
+function parsePositiveInt(value, fallback, max = 365) {
+  const parsed = Number.parseInt(value ?? String(fallback), 10)
+  if (!Number.isInteger(parsed) || parsed < 1) return fallback
+  return Math.min(parsed, max)
+}
+
+function parsePositiveFloat(value, fallback, max = 100) {
+  const parsed = Number.parseFloat(value ?? String(fallback))
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  return Math.min(parsed, max)
+}
 
 /**
  * GET /api/forecasting/forecast/:workspaceId
@@ -15,7 +32,9 @@ const router = express.Router()
 router.get('/forecast/:workspaceId', async (req, res, next) => {
   try {
     const { workspaceId } = req.params
-    const { metricType = 'completed_tasks', days = 30, forecastHorizon = 30 } = req.query
+    const metricType = req.query.metricType || 'completed_tasks'
+    const days = parsePositiveInt(req.query.days, 30)
+    const forecastHorizon = parsePositiveInt(req.query.forecastHorizon, 30, 180)
 
     // Fetch historical data
     const historicalQuery = `
@@ -25,7 +44,7 @@ router.get('/forecast/:workspaceId', async (req, res, next) => {
       ORDER BY snapshot_date DESC
       LIMIT $2
     `
-    const result = await pool.query(historicalQuery, [workspaceId, parseInt(days)])
+    const result = await pool.query(historicalQuery, [workspaceId, days])
 
     if (result.rows.length < 2) {
       return res.status(400).json({
@@ -56,7 +75,7 @@ router.get('/forecast/:workspaceId', async (req, res, next) => {
       timeSeries,
       0.2,
       0.1,
-      parseInt(forecastHorizon)
+      forecastHorizon
     )
 
     // Store forecast in database
@@ -91,7 +110,7 @@ router.get('/forecast/:workspaceId', async (req, res, next) => {
       data: {
         metricType,
         historicalDays: days,
-        forecastHorizon: parseInt(forecastHorizon),
+        forecastHorizon,
         currentTrend: forecast.trend > 0 ? 'increasing' : 'decreasing',
         trendStrength: Math.abs(forecast.trend),
         predictions: forecast.forecasts.slice(0, 10), // Return first 10 periods
@@ -111,7 +130,8 @@ router.get('/forecast/:workspaceId', async (req, res, next) => {
 router.get('/anomalies/:workspaceId', async (req, res, next) => {
   try {
     const { workspaceId } = req.params
-    const { days = 30, threshold = 2.5 } = req.query
+    const days = parsePositiveInt(req.query.days, 30)
+    const threshold = parsePositiveFloat(req.query.threshold, 2.5, 10)
 
     // Fetch historical data
     const query = `
@@ -121,7 +141,7 @@ router.get('/anomalies/:workspaceId', async (req, res, next) => {
       ORDER BY snapshot_date DESC
       LIMIT $2
     `
-    const result = await pool.query(query, [workspaceId, parseInt(days)])
+    const result = await pool.query(query, [workspaceId, days])
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'No analytics data found' })
@@ -131,7 +151,7 @@ router.get('/anomalies/:workspaceId', async (req, res, next) => {
     const completedTasks = rows.map(r => r.completed_tasks || 0)
 
     // Detect anomalies
-    const anomalies = ForecastEngine.detectAnomalies(completedTasks, parseFloat(threshold))
+    const anomalies = ForecastEngine.detectAnomalies(completedTasks, threshold)
 
     // Store anomalies in database
     const insertQuery = `
@@ -157,7 +177,7 @@ router.get('/anomalies/:workspaceId', async (req, res, next) => {
       data: {
         totalDataPoints: completedTasks.length,
         anomaliesDetected: anomalies.length,
-        threshold: parseFloat(threshold),
+        threshold,
         anomalies: anomalies.map(a => ({
           index: a.index,
           value: a.value,
@@ -274,7 +294,9 @@ router.post('/feedback/:forecastId', async (req, res, next) => {
 router.get('/history/:workspaceId', async (req, res, next) => {
   try {
     const { workspaceId } = req.params
-    const { limit = 50, offset = 0, metricType } = req.query
+    const metricType = req.query.metricType
+    const limit = parsePositiveInt(req.query.limit, 50, 200)
+    const offset = Math.max(Number.parseInt(req.query.offset ?? '0', 10) || 0, 0)
 
     let query = `
       SELECT * FROM analytics_forecasts
@@ -288,7 +310,7 @@ router.get('/history/:workspaceId', async (req, res, next) => {
     }
 
     query += ` ORDER BY forecast_date DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
-    params.push(parseInt(limit), parseInt(offset))
+    params.push(limit, offset)
 
     const result = await pool.query(query, params)
 
@@ -296,7 +318,7 @@ router.get('/history/:workspaceId', async (req, res, next) => {
       data: result.rows,
       pagination: {
         limit: parseInt(limit),
-        offset: parseInt(offset),
+        offset,
         total: result.rows.length
       }
     })
@@ -306,3 +328,5 @@ router.get('/history/:workspaceId', async (req, res, next) => {
 })
 
 module.exports = router
+module.exports.parsePositiveInt = parsePositiveInt
+module.exports.parsePositiveFloat = parsePositiveFloat

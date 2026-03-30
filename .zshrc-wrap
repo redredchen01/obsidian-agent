@@ -3,9 +3,9 @@
 # YD 2026 — Session Wrap & Auto-sync Aliases
 # Source this in ~/.zshrc: source ~/YD\ 2026/.zshrc-wrap
 
-export YD_WORKSPACE="/Users/dex/YD 2026"
-export YD_MEMORY="/Users/dex/.claude/projects/-Users-dex-YD-2026/memory"
-export YD_OBSIDIAN="$YD_WORKSPACE/obsidian"
+export YD_WORKSPACE="${YD_WORKSPACE:-/Users/dex/YD 2026}"
+export YD_MEMORY="${YD_MEMORY:-/Users/dex/.claude/projects/-Users-dex-YD-2026/memory}"
+export YD_OBSIDIAN="${YD_OBSIDIAN:-$YD_WORKSPACE/obsidian}"
 
 # Session Wrap — Save context at session end
 function wrap() {
@@ -25,19 +25,19 @@ alias sync-kb='bash "$YD_WORKSPACE/scripts/obsidian-sync.sh"'
 alias sync-all='wrap && sync-kb'
 
 # Agent tools (v3.4.0)
-alias agent-context='bash "$YD_WORKSPACE/scripts/agent-context.sh"'
-alias agent-share='bash "$YD_WORKSPACE/scripts/agent-share.sh"'
-alias agent-decision='bash "$YD_WORKSPACE/scripts/agent-decision.sh"'
-alias agent-checkpoint='bash "$YD_WORKSPACE/scripts/agent-checkpoint.sh"'
-alias agent-knowledge='bash "$YD_WORKSPACE/scripts/agent-knowledge.sh"'
-alias agent-optimize='bash "$YD_WORKSPACE/scripts/agent-optimize.sh"'
-alias agent-tasks='bash "$YD_WORKSPACE/scripts/agent-tasks.sh"'
+alias agent-context='bash "$YD_WORKSPACE/scripts/agent/agent-context.sh"'
+alias agent-share='bash "$YD_WORKSPACE/scripts/agent/agent-share.sh"'
+alias agent-decision='bash "$YD_WORKSPACE/scripts/agent/agent-decision.sh"'
+alias agent-checkpoint='bash "$YD_WORKSPACE/scripts/agent/agent-checkpoint.sh"'
+alias agent-knowledge='bash "$YD_WORKSPACE/scripts/agent/agent-knowledge.sh"'
+alias agent-optimize='bash "$YD_WORKSPACE/scripts/agent/agent-optimize.sh"'
+alias agent-tasks='bash "$YD_WORKSPACE/scripts/agent/agent-tasks.sh"'
 
 # Visualization tools (v3.4.0)
-alias visualize-tasks='bash "$YD_WORKSPACE/scripts/visualize-tasks.sh"'
-alias analyze-decisions='bash "$YD_WORKSPACE/scripts/analyze-decisions.sh"'
-alias memory-report='bash "$YD_WORKSPACE/scripts/memory-report.sh"'
-alias timeline='bash "$YD_WORKSPACE/scripts/timeline.sh"'
+alias visualize-tasks='bash "$YD_WORKSPACE/scripts/viz/visualize-tasks.sh"'
+alias analyze-decisions='bash "$YD_WORKSPACE/scripts/viz/analyze-decisions.sh"'
+alias memory-report='bash "$YD_WORKSPACE/scripts/viz/memory-report.sh"'
+alias timeline='bash "$YD_WORKSPACE/scripts/viz/timeline.sh"'
 
 # Memory shortcuts
 alias mem='cat "$YD_MEMORY/MEMORY.md" | head -50'
@@ -47,9 +47,8 @@ alias mem-edit='code "$YD_MEMORY"'
 # Status checks
 alias yd-km-status='echo "KB: $(find "$YD_OBSIDIAN" -name "*.md" | wc -l) files" && echo "Memory: $(ls -1 "$YD_MEMORY"/*.md 2>/dev/null | wc -l) files"'
 
-# Quick nav
+# Quick nav (pw 由 .zshrc-workspace 定義)
 alias kb='code "$YD_OBSIDIAN"'
-alias pw='cd "$YD_WORKSPACE" && pwd'
 
 # Session workflow
 function yd-start-session() {

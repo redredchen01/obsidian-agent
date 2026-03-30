@@ -65,6 +65,41 @@ describe("SessionManager", () => {
       const resume = manager.resume();
       expect(resume.hasEmergency).toBe(true);
     });
+
+    it("should ignore invalid newer emergency files when a valid checkpoint exists", () => {
+      const cpDir = path.join(tmpDir, "checkpoints");
+      fs.mkdirSync(cpDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(cpDir, "ctx-checkpoint-20260327-140000-000.md"),
+        "---\ntype: checkpoint\npercentage: 60\n---\n## Checkpoint at 60%\nWorking on auth.",
+        "utf8"
+      );
+      fs.writeFileSync(
+        path.join(cpDir, "ctx-emergency-20260327-150000-000.md"),
+        "garbage",
+        "utf8"
+      );
+
+      const resume = manager.resume();
+      expect(resume).not.toBeNull();
+      expect(resume.filename).toBe("ctx-checkpoint-20260327-140000-000.md");
+      expect(resume.summary).toContain("auth");
+    });
+
+    it("should recover summary from legacy checkpoint content without percentage", () => {
+      const cpDir = path.join(tmpDir, "checkpoints");
+      fs.mkdirSync(cpDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(cpDir, "ctx-checkpoint-20260327-140000-000.md"),
+        "---\ntype: checkpoint\n---\n## Checkpoint\nLegacy auth summary",
+        "utf8"
+      );
+
+      const resume = manager.resume();
+      expect(resume).not.toBeNull();
+      expect(resume.percentage).toBe(0);
+      expect(resume.summary).toBe("Legacy auth summary");
+    });
   });
 
   describe("formatResumeMessage", () => {

@@ -6,9 +6,17 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db/init');
 const { authenticateToken } = require('../middleware/auth');
+const { checkRole } = require('../middleware/authorization');
 
 // Middleware: Ensure user is authenticated
 router.use(authenticateToken);
+router.use(checkRole(['admin', 'editor', 'viewer']));
+
+function parseDays(value) {
+  const parsed = Number.parseInt(value ?? '30', 10);
+  if (!Number.isInteger(parsed) || parsed < 1) return 30;
+  return Math.min(parsed, 365);
+}
 
 // ===== ANALYTICS ENDPOINTS =====
 
@@ -16,7 +24,7 @@ router.use(authenticateToken);
 router.get('/analytics/dashboard/:workspaceId', async (req, res) => {
   try {
     const { workspaceId } = req.params;
-    const days = req.query.days || 30;
+    const days = parseDays(req.query.days);
 
     // Get latest snapshot
     const snapshotQuery = `
@@ -90,7 +98,7 @@ router.get('/analytics/dashboard/:workspaceId', async (req, res) => {
 router.get('/analytics/trends/:workspaceId', async (req, res) => {
   try {
     const { workspaceId } = req.params;
-    const days = req.query.days || 30;
+    const days = parseDays(req.query.days);
 
     const query = `
       SELECT
@@ -157,7 +165,7 @@ router.get('/analytics/trends/:workspaceId', async (req, res) => {
 router.get('/analytics/agents/:workspaceId', async (req, res) => {
   try {
     const { workspaceId } = req.params;
-    const days = req.query.days || 30;
+    const days = parseDays(req.query.days);
 
     const query = `
       SELECT
@@ -200,7 +208,7 @@ router.get('/analytics/agents/:workspaceId', async (req, res) => {
 router.get('/analytics/decisions/:workspaceId', async (req, res) => {
   try {
     const { workspaceId } = req.params;
-    const days = req.query.days || 30;
+    const days = parseDays(req.query.days);
 
     const query = `
       SELECT
@@ -257,7 +265,7 @@ router.get('/analytics/decisions/:workspaceId', async (req, res) => {
 router.get('/analytics/insights/:workspaceId', async (req, res) => {
   try {
     const { workspaceId } = req.params;
-    const days = req.query.days || 30;
+    const days = parseDays(req.query.days);
 
     // Fetch relevant data
     const snapshotQuery = `
@@ -397,3 +405,4 @@ function generateInsights(snapshots, decisions, agents) {
 
 // Export for testing
 module.exports = { router, generateInsights };
+module.exports.parseDays = parseDays;

@@ -83,6 +83,19 @@ describe("CheckpointManager", () => {
       expect(list.length).toBe(2);
       expect(list[0].summary).toBe("second");
     });
+
+    it("should ignore invalid checkpoint files", () => {
+      fs.writeFileSync(path.join(tmpDir, "ctx-checkpoint-20260327-140000-000.md"), "garbage");
+      fs.writeFileSync(
+        path.join(tmpDir, "ctx-checkpoint-20260327-150000-000.md"),
+        "---\ntype: checkpoint\ntimestamp: 2026-03-27T15:00:00Z\n---\n\n## Checkpoint\nValid summary",
+        "utf8"
+      );
+
+      const list = manager.list();
+      expect(list).toHaveLength(1);
+      expect(list[0].summary).toBe("Valid summary");
+    });
   });
 
   describe("latest", () => {
@@ -96,6 +109,22 @@ describe("CheckpointManager", () => {
 
       const latest = manager.latest();
       expect(latest.summary).toBe("new");
+    });
+
+    it("should prefer the latest valid timestamp over invalid timestamps", () => {
+      fs.writeFileSync(
+        path.join(tmpDir, "ctx-checkpoint-20260327-150000-000.md"),
+        "---\ntype: checkpoint\npercentage: 50\nthreshold: yellow\ntimestamp: 2026-03-27T15:00:00Z\n---\n\n## Checkpoint\nOlder valid",
+        "utf8"
+      );
+      fs.writeFileSync(
+        path.join(tmpDir, "ctx-checkpoint-20260327-160000-000.md"),
+        "---\ntype: checkpoint\npercentage: 70\nthreshold: orange\ntimestamp: invalid\n---\n\n## Checkpoint\nNewer invalid timestamp",
+        "utf8"
+      );
+
+      const latest = manager.latest();
+      expect(latest.summary).toBe("Older valid");
     });
   });
 

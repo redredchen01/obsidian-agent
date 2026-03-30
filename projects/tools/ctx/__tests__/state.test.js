@@ -183,6 +183,19 @@ describe("StateManager", () => {
       expect(content).toContain("src/auth.js");
       expect(content).toContain("src/index.js");
     });
+
+    it("should escape markdown table-breaking characters in file paths", () => {
+      state.init({ maxTokens: 200000 });
+      state.trackRead("src/a|b.js", 10);
+      state.trackRead("weird\nname.js", 5);
+      state.generateStatusMd();
+
+      const mdPath = path.join(tmpDir, "status.md");
+      const content = fs.readFileSync(mdPath, "utf8");
+      expect(content).toContain("src/a\\|b.js");
+      expect(content).toContain("| weird name.js | 5 | 1x |");
+      expect(content).not.toContain("weird\nname.js");
+    });
   });
 
   describe("shouldCheckpoint", () => {

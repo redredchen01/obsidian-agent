@@ -5,8 +5,11 @@
 
 set -e
 
-WORKSPACE="/Users/dex/YD 2026"
-MEMORY_DIR="/Users/dex/.claude/projects/-Users-dex-YD-2026/memory"
+# Load core library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/core.sh"
+
+WORKSPACE="$WORKSPACE_ROOT"
 OBSIDIAN_DIR="$WORKSPACE/obsidian"
 SESSION_WRAP_TOKEN_FILE="$HOME/.session-wrap/token"
 SESSION_WRAP_API_URL="${SESSION_WRAP_API_URL:-http://localhost:3000}"
@@ -14,16 +17,6 @@ SESSION_WRAP_API_URL="${SESSION_WRAP_API_URL:-http://localhost:3000}"
 TIMESTAMP=$(date +%Y-%m-%d\ %H:%M:%S)
 DATE=$(date +%Y%m%d)
 SUMMARY="${1:-Auto-wrap at session end}"
-
-# Detect agent type from environment or user-agent
-detect_agent_type() {
-  if [ -n "$CLAUDE_CODE_TOKEN" ]; then echo "claude-code"; return; fi
-  if [ -n "$CURSOR_TOKEN" ]; then echo "cursor"; return; fi
-  if [ -n "$WINDSURF_TOKEN" ]; then echo "windsurf"; return; fi
-  if [ -n "$CLINE_TOKEN" ]; then echo "cline"; return; fi
-  if [ -n "$AIDER_TOKEN" ]; then echo "aider"; return; fi
-  echo "unknown"
-}
 
 AGENT_TYPE=$(detect_agent_type)
 
@@ -77,7 +70,7 @@ fi
 echo ""
 echo "📋 Updating MEMORY index..."
 SYNC_TIME=$(date +%Y-%m-%d\ %H:%M)
-sed -i '' "s/\*最後更新：.*/\*最後更新：$SYNC_TIME (session-wrap)\*/" "$MEMORY_DIR/MEMORY.md" 2>/dev/null || true
+safe_sed "s/\*最後更新：.*/\*最後更新：$SYNC_TIME (session-wrap)\*/" "$MEMORY_DIR/MEMORY.md" 2>/dev/null || true
 
 # 4. Create checkpoint
 echo ""

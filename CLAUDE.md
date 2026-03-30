@@ -46,5 +46,4 @@ YD 2026/
 ```
 
 ## 注意
-- `dexapi`、`test-ydapi`、`watermark-0324` 不再是主項目入口。
-- README 中 session-wrap 產品文檔統一放在 `docs/`。
+- session-wrap 產品文檔已歸檔至 `docs/archive/session-wrap/`。

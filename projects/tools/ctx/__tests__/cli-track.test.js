@@ -61,6 +61,40 @@ describe("CLI track command (universal)", () => {
     expect(state.usedTokens).toBeGreaterThan(0);
   });
 
+  it("should preserve zero-line reads instead of falling back to default lines", () => {
+    execSync(`node "${CLI}" track read src/empty.js 0`, { cwd: tmpDir, encoding: "utf8" });
+    const state = getState();
+    expect(state.filesRead[0].lines).toBe(0);
+    expect(state.usedTokens).toBe(1500);
+  });
+
+  it("should reject negative read line counts", () => {
+    expect(() => {
+      execSync(`node "${CLI}" track read src/auth.js -10`, { cwd: tmpDir, encoding: "utf8" });
+    }).toThrow();
+
+    const state = getState();
+    expect(state.usedTokens).toBe(0);
+    expect(state.filesRead).toEqual([]);
+  });
+
+  it("should preserve zero-char responses instead of falling back to default chars", () => {
+    execSync(`node "${CLI}" track response 0`, { cwd: tmpDir, encoding: "utf8" });
+    const state = getState();
+    expect(state.responseCount).toBe(1);
+    expect(state.usedTokens).toBe(0);
+  });
+
+  it("should reject negative response sizes", () => {
+    expect(() => {
+      execSync(`node "${CLI}" track response -50`, { cwd: tmpDir, encoding: "utf8" });
+    }).toThrow();
+
+    const state = getState();
+    expect(state.responseCount).toBe(0);
+    expect(state.usedTokens).toBe(0);
+  });
+
   it("should auto-checkpoint at orange threshold", () => {
     // Push state to near orange
     execSync(`node "${CLI}" track tool`, { cwd: tmpDir, encoding: "utf8" });
