@@ -41,7 +41,7 @@ export class IndexManager {
   // ── Rebuild _graph.md (TF-IDF weighted suggestions) ─
 
   rebuildGraph(notes) {
-    if (!notes) notes = this.vault.scanNotes({ includeBody: true });
+    if (!notes) notes = this.vault.scanNotes();
     const today = todayStr();
     // Build note lookup for strength calculation
     const noteMap = new Map();
@@ -103,7 +103,7 @@ export class IndexManager {
     // Build keyword sets per note (title + summary words, 3+ chars)
     const noteKeywords = new Map();
     for (const n of nonJournal) {
-      const text = `${n.title} ${n.summary} ${n.body || ''}`.toLowerCase();
+      const text = `${n.title} ${n.summary}`.toLowerCase(); // lazy load body on demand
       const words = new Set(text.match(/[a-z\u4e00-\u9fff]{3,}/g) || []);
       noteKeywords.set(n.file, words);
     }
