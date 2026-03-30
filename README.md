@@ -77,6 +77,9 @@ obsidian-agent tag rename "old-tag" "new-tag"
 
 # Rebuild indices
 obsidian-agent sync
+
+# Open a note in Obsidian (macOS)
+obsidian-agent open my-note
 ```
 
 ## Vault Structure
@@ -171,6 +174,9 @@ related: ["[[other-note]]", "[[another-note]]"]
 | `watch` | Auto-rebuild indices on file changes |
 | `serve` | Start MCP server (stdio transport) |
 | `hook <event>` | Handle agent hook events |
+| `open [note]` | Open note in Obsidian.app (macOS) or reveal in Finder with `--reveal` |
+| `quicknote [prefix]` | Capture clipboard contents as an idea note |
+| `launchd <install\|uninstall\|status>` | Manage macOS LaunchAgents for auto journaling |
 
 ### Flags
 
@@ -186,6 +192,8 @@ related: ["[[other-note]]", "[[another-note]]"]
 | `--month <MM>` | Month for monthly review (1-12) |
 | `--summary <text>` | Set note summary (for update) |
 | `--tags <a,b,c>` | Set tags (for note/update) |
+| `--copy` | Copy result to clipboard (works with search, read, graph) |
+| `--reveal` | Reveal in Finder instead of opening (for `open` command) |
 
 ## Fuzzy Note Lookup
 
@@ -274,7 +282,7 @@ Run as an [MCP](https://modelcontextprotocol.io/) server for AI assistants (Clau
 }
 ```
 
-Exposes 19 tools: journal, note, capture, search, list, read, recent, delete, backlinks, update, archive, patch, stats, orphans, graph, health, sync, tag_list, tag_rename.
+Exposes 21 tools: journal, note, capture, search, list, read, recent, delete, backlinks, update, archive, patch, stats, orphans, graph, health, sync, tag_list, tag_rename, open, quicknote.
 
 ## Vault Health
 
@@ -327,6 +335,14 @@ obsidian-agent review --vault ~/my-vault
 obsidian-agent review monthly --vault ~/my-vault
 ```
 
+## macOS Integration
+
+- **Open in Obsidian**: `obsidian-agent open my-note` opens the note via `obsidian://` URI scheme
+- **Quick capture from clipboard**: `obsidian-agent quicknote` grabs clipboard contents and saves as an idea note
+- **LaunchAgent automation**: `obsidian-agent launchd install ~/vault` installs two LaunchAgents — daily-backfill (23:30) and weekly-review (Sunday 20:00)
+- **System notifications**: hook events trigger macOS Notification Center alerts
+- **Clipboard integration**: use the `--copy` flag on search, read, or graph to copy results to clipboard
+
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -364,7 +380,7 @@ Templates ship in English. Replace template content with your preferred language
 npm test
 ```
 
-Requires Node.js >= 18. Tests use `node:test` — zero dev dependencies.
+30 CLI commands, 21 MCP tools, 113 tests. Requires Node.js >= 18. Tests use `node:test` — zero dev dependencies.
 
 ## License
 
