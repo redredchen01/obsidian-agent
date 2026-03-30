@@ -4,12 +4,16 @@
 import { Vault } from '../vault.mjs';
 import { TemplateEngine } from '../templates.mjs';
 import { IndexManager } from '../index-manager.mjs';
-import { todayStr, weekdayShort, prevDate, nextDate } from '../dates.mjs';
+import { todayStr, isValidDate, weekdayShort, prevDate, nextDate } from '../dates.mjs';
 
 export function journal(vaultRoot, { date } = {}) {
   const vault = new Vault(vaultRoot);
   const tpl = new TemplateEngine(vaultRoot);
   const idx = new IndexManager(vault);
+
+  if (date && !isValidDate(date)) {
+    throw new Error(`Invalid date: ${date}. Use YYYY-MM-DD format.`);
+  }
   const d = date || todayStr();
 
   const existing = vault.read('journal', `${d}.md`);

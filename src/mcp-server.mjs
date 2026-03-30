@@ -54,6 +54,9 @@ const TOOLS = [
   { name: 'relink', description: 'Fix broken links with closest matches', inputSchema: { type: 'object', properties: { dry_run: { type: 'boolean', description: 'Preview only' } } } },
   { name: 'suggest', description: 'Actionable vault improvement suggestions', inputSchema: { type: 'object', properties: { limit: { type: 'number', description: 'Max suggestions (default: 10)' } } } },
   { name: 'daily', description: 'Daily dashboard (journal status, activity, pinned, projects)', inputSchema: { type: 'object', properties: {} } },
+  // macOS features
+  { name: 'open', description: 'Open a note in Obsidian.app (macOS) via obsidian:// URI', inputSchema: { type: 'object', properties: { note: { type: 'string', description: 'Note filename (optional — opens vault if omitted)' }, reveal: { type: 'boolean', description: 'Reveal in Finder instead of opening in Obsidian' } } } },
+  { name: 'quicknote', description: 'Capture clipboard contents as an idea note (macOS/Linux/Windows)', inputSchema: { type: 'object', properties: { prefix: { type: 'string', description: 'Optional prefix for the note title' } } } },
 ];
 
 // ── Dispatch table ───────────────────────────────────
@@ -98,6 +101,9 @@ const DISPATCH = {
   async relink(root, a) { const { relink } = await import('./commands/relink.mjs'); return relink(root, { dryRun: a.dry_run }); },
   async suggest(root, a) { const { suggest } = await import('./commands/suggest.mjs'); return suggest(root, { limit: a.limit }); },
   async daily(root) { const { daily } = await import('./commands/daily.mjs'); return daily(root); },
+  // macOS features
+  async open(root, a) { const { open } = await import('./commands/open.mjs'); return open(root, a.note, { reveal: a.reveal }); },
+  async quicknote(root, a) { const { quicknote } = await import('./commands/quicknote.mjs'); return quicknote(root, { prefix: a.prefix || '' }); },
 };
 
 // ── Server class ─────────────────────────────────────

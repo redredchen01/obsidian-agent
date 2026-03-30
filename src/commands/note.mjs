@@ -17,6 +17,9 @@ export function note(vaultRoot, title, type, { tags = [], goal = '', summary = '
   }
 
   const filename = title.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-').replace(/(^-|-$)/g, '');
+  if (!filename) {
+    throw new Error('Title must produce a valid filename (at least one alphanumeric character).');
+  }
   const dir = vault.typeDir(type);
 
   if (vault.exists(dir, `${filename}.md`)) {

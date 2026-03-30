@@ -72,8 +72,12 @@ description: |
 | 取消钉选 | `unpin` | `{note}` |
 | 钉选列表 | `pin_list` | `{}` — 所有收藏笔记 |
 | 修复坏链 | `relink` | `{dry_run?: false}` — fuzzy match 修复 |
+| 打开笔记 (macOS) | `open` | `{note?, reveal?}` — 在 Obsidian.app 中打开 |
+| 剪贴板速记 | `quicknote` | `{prefix?}` — 从剪贴板捕捉想法 |
 | 周回顾 | **CLI:** `obsidian-agent review` | |
 | 月回顾 | **CLI:** `obsidian-agent review monthly` | |
+| 安装定时任务 | **CLI:** `obsidian-agent launchd install` | macOS LaunchAgent |
+| 定时任务状态 | **CLI:** `obsidian-agent launchd status` | |
 | 导入笔记 | **CLI:** `obsidian-agent import <file>` | |
 
 ## 工作流模式
@@ -180,6 +184,14 @@ description: |
 5. **修改后:** 更新 `updated` 字段，call `sync` 重建索引
 6. **Related:** 主动维护双向链接
 
+## macOS 增强
+
+- **打开笔记:** `open({note: "my-note"})` → 在 Obsidian.app 中打开
+- **剪贴板速记:** `quicknote()` → 从剪贴板内容创建 idea 笔记
+- **搜索复制:** CLI `obsidian-agent search "关键词" --copy` → 结果进剪贴板
+- **定时维护:** `obsidian-agent launchd install` → 自动每日建日志 + 每周回顾
+- **系统通知:** hook 事件自动发送 macOS 通知中心提醒
+
 ## CLI Fallback
 
 MCP 不支持的命令用 Bash（OA_VAULT 已通过 setup 配置）：
@@ -188,4 +200,9 @@ MCP 不支持的命令用 Bash（OA_VAULT 已通过 setup 配置）：
 obsidian-agent review                # 周回顾
 obsidian-agent review monthly        # 月回顾
 obsidian-agent hook daily-backfill   # 从 git 历史建日志
+obsidian-agent launchd install       # 安装 macOS 定时任务
+obsidian-agent launchd status        # 查看定时任务状态
+obsidian-agent open my-note          # 在 Obsidian.app 打开
+obsidian-agent quicknote             # 从剪贴板速记
+obsidian-agent search "API" --copy   # 搜索结果复制到剪贴板
 ```

@@ -6,6 +6,12 @@ export function todayStr(tz = process.env.OA_TIMEZONE || 'UTC') {
   return new Date().toLocaleDateString('sv-SE', { timeZone: tz });
 }
 
+export function isValidDate(dateStr) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const d = new Date(dateStr + 'T12:00:00Z');
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === dateStr;
+}
+
 export function weekdayShort(dateStr) {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   return days[new Date(dateStr + 'T12:00:00Z').getDay()];
