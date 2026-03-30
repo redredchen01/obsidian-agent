@@ -46,7 +46,7 @@ export class IndexManager {
     const noteMap = new Map();
     for (const n of notes) noteMap.set(n.file, n);
 
-    let content = `---\ntitle: Knowledge Graph\ntype: index\nupdated: ${today}\n---\n\n# Knowledge Graph\n\n| Source | Links To | Strength |\n|--------|----------|----------|\n`;
+    let content = `---\ntitle: Knowledge Graph\ntype: index\nupdated: ${today}\n---\n\n# Knowledge Graph\n\n| Source | Links To | Type | nav |\n|--------|----------|------|-----|\n`;
 
     let relCount = 0;
     for (const note of notes) {
@@ -58,12 +58,14 @@ export class IndexManager {
           if (shared >= 2) strength = 'strong';
           else if (shared >= 1) strength = 'medium';
         }
-        content += `| [[${note.file}]] | [[${rel}]] | ${strength} |\n`;
+        content += `| [[${note.file}]] | [[${rel}]] | ${strength} | |\n`;
         relCount++;
       }
       if (note.dir === 'journal' && note.file.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        content += `| [[${note.file}]] | [[${prevDate(note.file)}]] | nav-prev |\n`;
-        content += `| [[${note.file}]] | [[${nextDate(note.file)}]] | nav-next |\n`;
+        const prevFile = prevDate(note.file);
+        const nextFile = nextDate(note.file);
+        content += `| [[${note.file}]] | [[${prevFile}]] | nav | nav-prev |\n`;
+        content += `| [[${note.file}]] | [[${nextFile}]] | nav | nav-next |\n`;
       }
     }
 
