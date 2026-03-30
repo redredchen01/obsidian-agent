@@ -466,9 +466,9 @@ kubectl rollout undo deployment/app -n prod
 
 ## 相關文檔
 
-- [docs/DEVELOPMENT.md](DEVELOPMENT.md) - 開發指南
-- [CONTRIBUTING.md](../CONTRIBUTING.md) - 貢獻流程
-- [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) - 故障排除
+- [WORKSPACE_STRUCTURE.md](WORKSPACE_STRUCTURE.md) - 工作區結構
+- [ARCHITECTURE.md](ARCHITECTURE.md) - 當前工作區架構
+- [CONTRIBUTING.md](CONTRIBUTING.md) - 貢獻流程
 
 ---
 

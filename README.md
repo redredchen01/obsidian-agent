@@ -8,7 +8,7 @@ Works with Claude Code, Cursor, Windsurf, Cline, Aider, and any AI agent.
 
 ## ✨ What's New (v3.9.0)
 
-**Phase 9:** Dashboard Backend API Server — bridges bash agent tools to the React dashboard via REST API.
+**Phase 9:** Dashboard Backend API Server — historical release notes for the session-wrap stack now housed under `projects/tools/`.
 
 - Express server on `:3001` with localhost-only CORS
 - Task CRUD via single-writer model (delegates to `agent-tasks.sh`)
@@ -43,7 +43,7 @@ Works with Claude Code, Cursor, Windsurf, Cline, Aider, and any AI agent.
 |--------|---------|-------|
 | **setup.sh** | One-command project initialization | 15 min → 2 min |
 | **deploy-railway.sh** | Automated Railway backend deployment | Manual → 5 min |
-| **web/** (React dashboard) | Real-time team monitoring | New in v3.6.0 |
+| **docs/** | Product docs, guides, and archived rollout notes | Consolidated in workspace docs |
 
 ## Features
 
@@ -55,7 +55,7 @@ Works with Claude Code, Cursor, Windsurf, Cline, Aider, and any AI agent.
 - 📚 **Knowledge base** — Persistent project conventions & architecture
 - ⚙️ **Auto-optimize** — Keep memory lean for context windows
 - 🔐 **Git-backed** — Checkpoints with full rollback support
-- 🎯 **Web Dashboard** — Real-time team monitoring (React, Vercel-deployed)
+- 🎯 **Web Dashboard** — Historical session-wrap dashboard capability, now moved out of the workspace root
 - ⚡ **Setup Automation** — New user setup: 15 min → 2 min
 - 🚀 **One-Click Deployment** — Deploy backend to Railway in 5 minutes
 
@@ -66,16 +66,15 @@ Start here based on your needs:
 | Guide | Purpose |
 |-------|---------|
 | **[README.md](README.md)** (you are here) | Feature overview & quick reference |
-| **[QUICKSTART-EXAMPLES.md](QUICKSTART-EXAMPLES.md)** | 3 real-world copy-paste examples |
-| **[AGENT-WORKFLOW.md](AGENT-WORKFLOW.md)** | 6 workflow patterns + best practices |
-| **[INTEGRATIONS.md](INTEGRATIONS.md)** | Claude Code, Cursor, Windsurf setup |
-| **[PRODUCTION-SETUP.md](PRODUCTION-SETUP.md)** | Deploy backend to Railway/Docker/VPS |
-| **[web/README.md](web/README.md)** | Dashboard setup, deployment, and usage |
-| **[DASHBOARD-DEPLOYMENT-GUIDE.md](DASHBOARD-DEPLOYMENT-GUIDE.md)** | Local dev, Vercel, Docker, backend integration |
-| **[VISUALIZATION-GUIDE.md](VISUALIZATION-GUIDE.md)** | Visualize tasks, decisions, memory, timeline |
-| **[FAQ-TROUBLESHOOTING.md](FAQ-TROUBLESHOOTING.md)** | Common issues & solutions |
-| **[BENCHMARKS.md](BENCHMARKS.md)** | Productivity metrics & time savings |
-| **[MIGRATION.md](MIGRATION.md)** | Upgrade from v3.3 to v3.4.0 |
+| **[docs/QUICKSTART-EXAMPLES.md](docs/QUICKSTART-EXAMPLES.md)** | 3 real-world copy-paste examples |
+| **[docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md)** | 6 workflow patterns + best practices |
+| **[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)** | Claude Code, Cursor, Windsurf setup |
+| **[docs/PRODUCTION-SETUP.md](docs/PRODUCTION-SETUP.md)** | Deploy backend to Railway/Docker/VPS |
+| **[docs/DASHBOARD-DEPLOYMENT-GUIDE.md](docs/DASHBOARD-DEPLOYMENT-GUIDE.md)** | Historical dashboard/backend deployment notes |
+| **[docs/VISUALIZATION-GUIDE.md](docs/VISUALIZATION-GUIDE.md)** | Visualize tasks, decisions, memory, timeline |
+| **[docs/FAQ-TROUBLESHOOTING.md](docs/FAQ-TROUBLESHOOTING.md)** | Common issues & solutions |
+| **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)** | Productivity metrics & time savings |
+| **[docs/MIGRATION.md](docs/MIGRATION.md)** | Upgrade from v3.3 to v3.4.0 |
 
 ### Real-World Workflow Guides
 
@@ -83,22 +82,22 @@ See how session-wrap works in practice across different team structures:
 
 | Scenario | Guide | Team Size | Key Features |
 |----------|-------|-----------|--------------|
-| **Async Open Source** | [OPENSOURCE-COLLABORATION.md](OPENSOURCE-COLLABORATION.md) | 4+ distributed | Self-onboarding, decision logging, task coordination |
-| **Early-Stage Startup** | [STARTUP-TEAM-WORKFLOW.md](STARTUP-TEAM-WORKFLOW.md) | 3-5 people | Daily standups, async code review, shared decisions |
-| **Enterprise Multi-Team** | [ENTERPRISE-ADOPTION.md](ENTERPRISE-ADOPTION.md) | 50+ people | Cross-team coordination, knowledge sharing, incident learning |
-| **Solo Developer** | [SOLO-DEVELOPER.md](SOLO-DEVELOPER.md) | 1 person | Context switching, project management, client billing |
+| **Async Open Source** | [docs/OPENSOURCE-COLLABORATION.md](docs/OPENSOURCE-COLLABORATION.md) | 4+ distributed | Self-onboarding, decision logging, task coordination |
+| **Early-Stage Startup** | [docs/STARTUP-TEAM-WORKFLOW.md](docs/STARTUP-TEAM-WORKFLOW.md) | 3-5 people | Daily standups, async code review, shared decisions |
+| **Enterprise Multi-Team** | [docs/ENTERPRISE-ADOPTION.md](docs/ENTERPRISE-ADOPTION.md) | 50+ people | Cross-team coordination, knowledge sharing, incident learning |
+| **Solo Developer** | [docs/SOLO-DEVELOPER.md](docs/SOLO-DEVELOPER.md) | 1 person | Context switching, project management, client billing |
 
 ### Quick Path to Success
 
-1. **First 5 min:** Read [QUICKSTART-EXAMPLES.md](QUICKSTART-EXAMPLES.md) → Copy Example 1
+1. **First 5 min:** Read [docs/QUICKSTART-EXAMPLES.md](docs/QUICKSTART-EXAMPLES.md) → Copy Example 1
 2. **First session:** Follow Example 1, save your first session wrap
-3. **Multi-agent:** When ready, follow [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md) Pattern 2
-4. **Team setup:** See [INTEGRATIONS.md](INTEGRATIONS.md) for your editor
+3. **Multi-agent:** When ready, follow [docs/AGENT-WORKFLOW.md](docs/AGENT-WORKFLOW.md) Pattern 2
+4. **Team setup:** See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for your editor
 5. **Real-world:** Find your scenario in the workflow guides above
 
 ## Upgrade from v3.3 → v3.4.0
 
-See **[MIGRATION.md](MIGRATION.md)** for step-by-step upgrade guide.
+See **[docs/MIGRATION.md](docs/MIGRATION.md)** for step-by-step upgrade guide.
 
 **Note:** v3.4.0 is fully backward compatible. No breaking changes.
 
@@ -321,7 +320,7 @@ export SESSION_WRAP_API_URL="http://localhost:3000"  # Optional: cloud sync
 
 ## Backend (Optional)
 
-For cloud synchronization and team dashboards, deploy session-wrap-backend:
+For cloud synchronization and team dashboards, use the backend project under `projects/tools/session-wrap-backend/`:
 
 ### Quick Deploy to Railway
 
@@ -335,35 +334,17 @@ This automates:
 - Database configuration
 - Deployment instructions
 
-See **[PRODUCTION-SETUP.md](PRODUCTION-SETUP.md)** for full deployment guide.
+See **[docs/PRODUCTION-SETUP.md](docs/PRODUCTION-SETUP.md)** for full deployment guide.
 
-**Note:** Backend enables cloud sync and web dashboards for distributed teams. Fully optional — CLI tools work perfectly without it.
+**Note:** Backend enables cloud sync and dashboards for distributed teams. In this workspace, related backend/frontend code lives under `projects/tools/`. CLI tools still work without it.
 
-## Web Dashboard
+## Dashboard Status
 
-Real-time monitoring dashboard for distributed teams:
+The legacy top-level `web/` dashboard and `server/` backend are not present in this workspace snapshot.
 
-```bash
-cd web
-npm install
-npm run dev                  # Local dev (http://localhost:5173)
-npm run build                # Production build
-```
-
-Deploy to Vercel with one click:
-
-```bash
-npm i -g vercel
-vercel
-```
-
-**Features:**
-- 📊 Task status visualization (pending/in-progress/completed)
-- 🎯 Decision timeline with reasoning chains
-- 💾 Memory usage metrics and growth trends
-- 🔄 Real-time sync status and active agents
-
-See **[web/README.md](web/README.md)** for full setup and configuration.
+- Dashboard-related documentation has been retained under [`docs/`](docs/)
+- Current code locations are `projects/tools/session-wrap-backend/` and `projects/tools/session-wrap-skill/{web,server}`
+- Any setup note that assumes top-level `web/` or `server/` should be treated as historical
 
 ## Files
 
@@ -372,7 +353,6 @@ See **[web/README.md](web/README.md)** for full setup and configuration.
 - `scripts/deploy-railway.sh` — Railway backend deployment automation
 - `scripts/setup.sh` — One-command project initialization
 - `scripts/agent-*.sh` — 7 agent coordination tools
-- `web/` — React dashboard (React + Vite + TypeScript)
 - `.zshrc-wrap` — Aliases and workflow aliases
 - `package.json` — npm metadata
 
@@ -506,14 +486,14 @@ agent-knowledge get "architecture"        # Understand design
 #### Added
 - 🚀 `scripts/setup.sh` — One-command project initialization (15 min → 2 min)
 - 🔧 `scripts/deploy-railway.sh` — Automated Railway backend deployment
-- 🎯 Web Dashboard (`web/`) — Real-time team monitoring with React + Vite
+- 🎯 Web Dashboard (later moved under `projects/tools/`) — Real-time team monitoring with React + Vite
   - TaskBoard: Visual task status columns
   - DecisionTimeline: Chronological decision history
   - MemoryStats: Usage trends with sparkline charts
   - SyncStatus: Agent connection monitoring
   - Vercel deployment ready
 - 📖 `DASHBOARD-DEPLOYMENT-GUIDE.md` — Full deployment documentation
-- 📚 `web/README.md` — Dashboard setup and usage guide
+- 📚 Dashboard setup docs — now tracked via `docs/DASHBOARD-DEPLOYMENT-GUIDE.md` and tool subprojects
 
 #### Improved
 - README updated with v3.6.0 features

@@ -28,6 +28,20 @@ YD 2026 工作區的版本歷史。
 - 開發流程文檔完整化
 - 新開發者快速上手資料
 
+## [3.4.0] - 2026-03-30
+
+### Changed
+- 將工作區主入口重新對齊到真實活躍項目
+  - `p1` → `projects/production/gwx`
+  - `p2` → `projects/production/claude_code_telegram_bot`
+  - `p3` → `projects/experimental/NS_0327`
+- 重寫 `CLAUDE.md`、`PROJECTS_INFO.md`、`docs/WORKSPACE_STRUCTURE.md`、`docs/ARCHITECTURE.md`
+- 修正 README 與腳本中的文檔路徑，統一指向 `docs/`
+
+### Fixed
+- 移除把使用者帶到空殼目錄的舊別名與舊主項目說明
+- 標記 `web/` 與 `server/` 相關說明為歷史資料，不再假定當前工作區存在
+
 ---
 
 ## [3.2.0] - 2026-03-26
@@ -152,13 +166,13 @@ YD 2026 工作區的版本歷史。
 
 2. 驗證項目路徑
    ```bash
-   p1 && git status  # 應該進入 projects/production/dexapi
+   p1 && git status  # 應該進入 projects/production/gwx
    ```
 
 3. 閱讀新文檔
-   - 開發者：讀 `docs/DEVELOPMENT.md`
-   - 貢獻者：讀 `CONTRIBUTING.md`
-   - 故障排除：讀 `docs/TROUBLESHOOTING.md`
+   - 工作區：讀 `PROJECTS_INFO.md`
+   - 貢獻者：讀 `docs/CONTRIBUTING.md`
+   - 結構：讀 `docs/WORKSPACE_STRUCTURE.md`
 
 ### 從 3.1.0 升級到 3.2.0
 
@@ -171,7 +185,7 @@ YD 2026 工作區的版本歷史。
 p1          # 自動更新到新位置
 
 # 更新本地設置（如有）
-cd projects/production/dexapi
+cd projects/production/gwx
 # 重新配置任何硬編碼路徑
 ```
 
@@ -183,6 +197,11 @@ cd projects/production/dexapi
 - 項目路徑變更
   - 舊：`./dexapi` → 新：`./projects/production/dexapi`
   - 舊：`./watermark 0324` → 新：`./projects/production/watermark-0324`
+
+### v3.4.0
+- 工作區主入口變更
+  - 舊：`p1`/`p2`/`p3` 指向空殼歷史目錄
+  - 新：`p1`=`gwx`，`p2`=`claude_code_telegram_bot`，`p3`=`NS_0327`
 
 **遷移步驟：**
 1. 更新本地腳本和配置中的路徑
@@ -206,7 +225,7 @@ cd projects/production/dexapi
 
 ## 貢獻
 
-見 [CONTRIBUTING.md](../CONTRIBUTING.md)
+見 [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
@@ -216,4 +235,4 @@ MIT
 
 ---
 
-**最後更新：** 2026-03-26
+**最後更新：** 2026-03-30
