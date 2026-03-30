@@ -3,161 +3,191 @@
  * Improves performance for repeated searches
  */
 
+import crypto from 'crypto';
 import { promises as fs } from 'fs';
 import { dirname } from 'path';
 
 class SearchCache {
-  constructor(ttlMs = 10 * 60 * 1000) { // 10 minutes default
+  constructor(vault, options = {}) {
+    this.vault = vault;
     this.cache = new Map();
-    this.ttl = ttlMs;
-    this.hitCount = 0;
-    this.missCount = 0;
+    this.ttl = options.ttl ?? (10 * 60 * 1000); // 10 minutes default
+
+    if (typeof this.ttl !== 'number' || this.ttl < 0) {
+      throw new Error('TTL must be a non-negative number');
+    }
+
+    this._hits = 0;
+    this._misses = 0;
+    this._lastStatTime = Date.now();
     this.diskPath = null;
-    this.vaultVersion = null;
   }
 
   /**
-   * Generate cache key from search parameters using fast hashing.
-   * Uses simple string concatenation for O(1) speed on typical inputs.
+   * Generate cache key from search parameters using SHA256 hash.
+   * Ensures collision-free keys for complex option objects.
    * @param {string} keyword - Search keyword
-   * @param {Object} options - Search options
+   * @param {Object} opts - Search options
    * @returns {string} Cache key
    */
-  _getCacheKey(keyword, options = {}) {
-    const { type, tag, status, regex } = options;
-    // Simple concatenation is fast and deterministic
-    return `${keyword}|${type || ''}|${tag || ''}|${status || ''}|${regex ? 'regex' : ''}`;
+  _generateKey(keyword, opts) {
+    const combined = JSON.stringify({ keyword, opts: JSON.parse(JSON.stringify(opts)) });
+    return crypto.createHash('sha256').update(combined).digest('hex');
   }
 
   /**
    * Get cached search result if valid
    * @param {string} keyword - Search keyword
-   * @param {Object} options - Search options
+   * @param {Object} opts - Search options
    * @returns {Array|null} Cached results or null if expired/missing
    */
-  get(keyword, options = {}) {
-    const key = this._getCacheKey(keyword, options);
+  get(keyword, opts = {}) {
+    const key = this._generateKey(keyword, opts);
     const entry = this.cache.get(key);
 
     if (!entry) {
-      this.missCount++;
+      this._misses++;
       return null;
     }
 
     // Check if expired
     if (Date.now() - entry.timestamp > this.ttl) {
       this.cache.delete(key);
-      this.missCount++;
+      this._misses++;
       return null;
     }
 
-    this.hitCount++;
+    this._hits++;
     return entry.results;
   }
 
   /**
    * Cache search results
    * @param {string} keyword - Search keyword
-   * @param {Object} options - Search options
+   * @param {Object} opts - Search options
    * @param {Array} results - Search results
    */
-  set(keyword, options = {}, results) {
-    const key = this._getCacheKey(keyword, options);
+  set(keyword, opts = {}, results) {
+    const key = this._generateKey(keyword, opts);
     this.cache.set(key, {
       results,
       timestamp: Date.now(),
+      keyword,
+      opts
     });
-    // Non-blocking write-through to disk
-    if (this.diskPath && this.vaultVersion) {
-      setImmediate(() => this.saveToDisk(this.diskPath, this.vaultVersion));
-    }
   }
 
   /**
    * Invalidate all cache entries
    * Used when vault changes
    */
-  clear() {
+  invalidate() {
     this.cache.clear();
-    this.hitCount = 0;
-    this.missCount = 0;
-  }
-
-  /**
-   * Invalidate specific cache entry
-   * @param {string} keyword - Search keyword
-   * @param {Object} options - Search options
-   */
-  invalidate(keyword, options = {}) {
-    const key = this._getCacheKey(keyword, options);
-    this.cache.delete(key);
+    this._hits = 0;
+    this._misses = 0;
+    this._lastStatTime = Date.now();
   }
 
   /**
    * Get cache statistics
-   * @returns {Object} Cache stats
+   * @returns {Object} Cache stats including hits, misses, size, age, timestamp, vaultVersion
    */
   stats() {
-    let validEntries = 0;
-    let expiredEntries = 0;
+    const now = Date.now();
+    let size = 0;
 
-    this.cache.forEach(entry => {
-      if (Date.now() - entry.timestamp > this.ttl) {
-        expiredEntries++;
-      } else {
-        validEntries++;
-      }
-    });
-
-    const total = this.hitCount + this.missCount;
-    const hitRate = total > 0 ? ((this.hitCount / total) * 100).toFixed(2) : 0;
+    // Calculate total size of cached results
+    for (const entry of this.cache.values()) {
+      size += JSON.stringify(entry.results).length;
+    }
 
     return {
-      totalEntries: this.cache.size,
-      validEntries,
-      expiredEntries,
-      ttlMs: this.ttl,
-      hits: this.hitCount,
-      misses: this.missCount,
-      hitRate: parseFloat(hitRate),
+      hits: this._hits,
+      misses: this._misses,
+      size,
+      age: now - this._lastStatTime,
+      timestamp: now,
+      vaultVersion: this.vault?._vaultVersion || 'unknown'
     };
   }
 
   /**
-   * Load cache from disk (async)
+   * Serialize cache state for persistence
+   * @returns {Object} Serializable cache state
+   */
+  toDisk() {
+    const entries = Array.from(this.cache.values()).map(entry => ({
+      keyHash: this._generateKey(entry.keyword, entry.opts),
+      keyword: entry.keyword,
+      opts: entry.opts,
+      results: entry.results,
+      timestamp: entry.timestamp
+    }));
+
+    return {
+      version: '1',
+      vaultVersion: this.vault?._vaultVersion || 'unknown',
+      ttl: this.ttl,
+      hits: this._hits,
+      misses: this._misses,
+      entries,
+      savedAt: Date.now()
+    };
+  }
+
+  /**
+   * Restore cache state from persisted data
+   * @param {Object} state - Serialized cache state from toDisk()
+   */
+  fromDisk(state) {
+    if (!state || !Array.isArray(state.entries)) {
+      return; // Invalid state, use empty cache
+    }
+
+    this.ttl = state.ttl ?? this.ttl;
+    this._hits = state.hits ?? 0;
+    this._misses = state.misses ?? 0;
+    this.cache.clear();
+
+    // Restore entries from disk
+    for (const entry of state.entries) {
+      this.cache.set(
+        entry.keyHash,
+        {
+          results: entry.results,
+          timestamp: entry.timestamp,
+          keyword: entry.keyword,
+          opts: entry.opts
+        }
+      );
+    }
+  }
+
+  /**
+   * Load cache from disk (async, non-blocking)
    * Called on process startup to restore cache if valid
    * @param {string} diskPath - Path to cache.json file
-   * @param {string} vaultVersion - Current vault version
    */
-  async loadFromDisk(diskPath, vaultVersion) {
+  async loadFromDisk(diskPath) {
     this.diskPath = diskPath;
-    this.vaultVersion = vaultVersion;
 
     try {
       const data = await fs.readFile(diskPath, 'utf8');
       const cached = JSON.parse(data);
 
       // Validate vault version match
-      if (cached.vaultVersion !== vaultVersion) {
+      if (this.vault && cached.vaultVersion !== this.vault._vaultVersion) {
         return; // Silent fail: version mismatch
       }
 
       // Skip if cache is too old
-      const age = Date.now() - cached.timestamp;
+      const age = Date.now() - cached.savedAt;
       if (age > this.ttl) {
         return; // Silent fail: expired
       }
 
-      // Restore valid entries only
-      if (cached.entries && Array.isArray(cached.entries)) {
-        cached.entries.forEach(([key, entry]) => {
-          // Skip expired entries
-          const entryAge = Date.now() - entry.timestamp;
-          if (entryAge <= this.ttl) {
-            this.cache.set(key, entry);
-          }
-        });
-      }
+      // Restore valid entries
+      this.fromDisk(cached);
     } catch (err) {
       // Silent fail on any I/O error: file missing, parse error, etc.
     }
@@ -167,24 +197,10 @@ class SearchCache {
    * Save cache to disk (async, non-blocking)
    * Write-through: serialize valid entries only
    * @param {string} diskPath - Path to cache.json file
-   * @param {string} vaultVersion - Current vault version
    */
-  async saveToDisk(diskPath, vaultVersion) {
+  async saveToDisk(diskPath) {
     try {
-      // Serialize only valid entries
-      const entries = [];
-      this.cache.forEach((entry, key) => {
-        const age = Date.now() - entry.timestamp;
-        if (age <= this.ttl) {
-          entries.push([key, entry]);
-        }
-      });
-
-      const data = {
-        vaultVersion,
-        timestamp: Date.now(),
-        entries,
-      };
+      const data = this.toDisk();
 
       // Ensure directory exists
       const dir = dirname(diskPath);
