@@ -2,7 +2,7 @@ Search notes in the knowledge base.
 
 Usage: `<keyword> [--type TYPE] [--tag TAG] [--status STATUS]`
 
-Run: `obsidian-agent search "<keyword>" [--type TYPE] [--tag TAG] [--status STATUS]`
+Run: `clausidian search "<keyword>" [--type TYPE] [--tag TAG] [--status STATUS]`
 
 If the CLI is not available:
 1. Parse search parameters

@@ -5,6 +5,8 @@
  * CLI and MCP server both consume this registry.
  */
 
+import { readFileSync } from 'fs';
+
 // ── Registry ────────────────────────────────────────────
 
 const COMMANDS = [
@@ -43,7 +45,7 @@ const COMMANDS = [
       const { note } = await import('./commands/note.mjs');
       const title = flags.title || pos[0];
       const type = flags.type || pos[1];
-      if (!title || !type) throw new Error('Usage: obsidian-agent note <title> <type>');
+      if (!title || !type) throw new Error('Usage: clausidian note <title> <type>');
       const tags = flags.tags ? (Array.isArray(flags.tags) ? flags.tags : flags.tags.split(',')) : [];
       return note(root, title, type, { tags, goal: flags.goal, summary: flags.summary });
     },
@@ -57,7 +59,7 @@ const COMMANDS = [
     async run(root, flags, pos) {
       const { capture } = await import('./commands/capture.mjs');
       const idea = flags.idea || pos.join(' ');
-      if (!idea) throw new Error('Usage: obsidian-agent capture <idea text>');
+      if (!idea) throw new Error('Usage: clausidian capture <idea text>');
       return capture(root, idea);
     },
   },
@@ -224,7 +226,7 @@ const COMMANDS = [
       const { rename } = await import('./commands/rename.mjs');
       const n = flags.note || pos[0];
       const t = flags.new_title || pos[1];
-      if (!n || !t) throw new Error('Usage: obsidian-agent rename <note-name> <new-title>');
+      if (!n || !t) throw new Error('Usage: clausidian rename <note-name> <new-title>');
       return rename(root, n, t);
     },
   },
@@ -241,7 +243,7 @@ const COMMANDS = [
       const { move } = await import('./commands/move.mjs');
       const n = flags.note || pos[0];
       const t = flags.new_type || pos[1];
-      if (!n || !t) throw new Error('Usage: obsidian-agent move <note-name> <new-type>');
+      if (!n || !t) throw new Error('Usage: clausidian move <note-name> <new-type>');
       return move(root, n, t);
     },
   },
@@ -258,7 +260,7 @@ const COMMANDS = [
       const { merge } = await import('./commands/merge.mjs');
       const s = flags.source || pos[0];
       const t = flags.target || pos[1];
-      if (!s || !t) throw new Error('Usage: obsidian-agent merge <source-note> <target-note>');
+      if (!s || !t) throw new Error('Usage: clausidian merge <source-note> <target-note>');
       return merge(root, s, t);
     },
   },
@@ -653,7 +655,7 @@ const COMMANDS = [
         const { tagList } = await import('./commands/tag.mjs');
         return tagList(root);
       }
-      throw new Error('Usage: obsidian-agent tag <rename|list>');
+      throw new Error('Usage: clausidian tag <rename|list>');
     },
   },
 
@@ -683,16 +685,43 @@ const COMMANDS = [
     usage: 'hook <event>',
     async run(root, flags, pos) {
       const event = pos[0];
-      if (event === 'session-stop') {
-        const { sessionStop } = await import('./commands/hook.mjs');
-        return sessionStop(root, { scanRoot: flags['scan-root'] });
-      } else if (event === 'daily-backfill') {
-        const { dailyBackfill } = await import('./commands/hook.mjs');
-        return dailyBackfill(root, {
-          date: flags.date, scanRoot: flags['scan-root'], force: flags.force === true,
-        });
+
+      // Centralized stdin JSON parsing for all hook events
+      let payload = {};
+      try {
+        const stdin = readFileSync('/dev/stdin', 'utf8');
+        if (stdin.trim()) {
+          payload = JSON.parse(stdin);
+        }
+      } catch (err) {
+        // Silent failure for stdin read (may not be piped)
+        // JSON parse error will be caught below
       }
-      throw new Error(`Unknown hook event: ${event}\nAvailable: session-stop, daily-backfill`);
+
+      try {
+        const { sessionStop, dailyBackfill, noteCreated, noteUpdated, noteDeleted, indexRebuilt } = await import('./commands/hook.mjs');
+
+        if (event === 'session-stop') {
+          return sessionStop(root, { ...payload, scanRoot: flags['scan-root'] });
+        } else if (event === 'daily-backfill') {
+          return dailyBackfill(root, {
+            ...payload, date: flags.date, scanRoot: flags['scan-root'], force: flags.force === true,
+          });
+        } else if (event === 'note-created') {
+          return noteCreated(root, payload);
+        } else if (event === 'note-updated') {
+          return noteUpdated(root, payload);
+        } else if (event === 'note-deleted') {
+          return noteDeleted(root, payload);
+        } else if (event === 'index-rebuilt') {
+          return indexRebuilt(root, payload);
+        }
+        throw new Error(`Unknown hook event: ${event}\nAvailable: session-stop, daily-backfill, note-created, note-updated, note-deleted, index-rebuilt`);
+      } catch (err) {
+        // Hook failure doesn't block main flow (best-effort)
+        console.error(`[hook error] ${err.message}`);
+        return { status: 'error', event, error: err.message };
+      }
     },
   },
   {
@@ -731,6 +760,49 @@ const COMMANDS = [
       return quicknote(root, { title: flags.title });
     },
   },
+  // ── Bridge (cross-system integrations) ──
+  {
+    name: 'bridge',
+    description: 'Sync external systems (Google Calendar, Gmail, GitHub) to vault',
+    usage: 'bridge <gcal|gmail|github> [--date DATE]',
+    subcommands: {
+      gcal: {
+        mcpName: 'bridge_gcal',
+        description: 'Sync Google Calendar events to journal',
+        mcpSchema: {
+          date: { type: 'string', description: 'Date to sync (YYYY-MM-DD, default: today)' },
+        },
+        async run(root, flags) {
+          const { bridgeGcal } = await import('./commands/bridge.mjs');
+          return bridgeGcal(root, { date: flags.date });
+        },
+      },
+      gmail: {
+        mcpName: 'bridge_gmail',
+        description: 'Sync Gmail messages to vault',
+        mcpSchema: {
+          label: { type: 'string', description: 'Gmail label (default: important)' },
+          days: { type: 'number', description: 'Look back N days (default: 1)' },
+        },
+        async run(root, flags) {
+          const { bridgeGmail } = await import('./commands/bridge.mjs');
+          return bridgeGmail(root, { label: flags.label, days: flags.days });
+        },
+      },
+      github: {
+        mcpName: 'bridge_github',
+        description: 'Sync GitHub activity to vault',
+        mcpSchema: {
+          repo: { type: 'string', description: 'Repository (owner/repo)' },
+          days: { type: 'number', description: 'Look back N days (default: 1)' },
+        },
+        async run(root, flags) {
+          const { bridgeGithub } = await import('./commands/bridge.mjs');
+          return bridgeGithub(root, { repo: flags.repo, days: flags.days });
+        },
+      },
+    },
+  },
   {
     name: 'launchd',
     description: 'Install/uninstall macOS LaunchAgents for automated vault maintenance',
@@ -738,231 +810,6 @@ const COMMANDS = [
     async run(root, flags, pos) {
       const { launchd } = await import('./commands/launchd.mjs');
       return launchd(root, pos[0], flags);
-    },
-  },
-  // ── Bases ──
-  {
-    name: 'base',
-    description: 'Manage Obsidian Bases (.base) — structured data views over vault notes',
-    usage: 'base <create|read|query> <name>',
-    subcommands: {
-      create: {
-        mcpName: 'base_create',
-        description: 'Create a new .base file with filters and views',
-        mcpSchema: { name: { type: 'string', description: 'Base filename' } },
-        mcpRequired: ['name'],
-        async run(root, flags) {
-          const { baseCreate } = await import('./commands/base.mjs');
-          return baseCreate(root, flags.name, flags);
-        },
-      },
-      read: {
-        mcpName: 'base_read',
-        description: 'Read and parse a .base file',
-        mcpSchema: { name: { type: 'string', description: 'Base filename' } },
-        mcpRequired: ['name'],
-        async run(root, flags) {
-          const { baseRead } = await import('./commands/base.mjs');
-          return baseRead(root, flags.name);
-        },
-      },
-      query: {
-        mcpName: 'base_query',
-        description: 'Query vault notes using a base definition',
-        mcpSchema: {
-          name: { type: 'string', description: 'Base filename' },
-          view: { type: 'string', description: 'View name to use (default: first view)' },
-        },
-        mcpRequired: ['name'],
-        async run(root, flags) {
-          const { baseQuery } = await import('./commands/base.mjs');
-          return baseQuery(root, flags.name, { view: flags.view });
-        },
-      },
-    },
-    async run(root, flags, pos) {
-      const sub = pos[0];
-      const name = flags.name || pos[1];
-      switch (sub) {
-        case 'create': {
-          const { baseCreate } = await import('./commands/base.mjs');
-          return baseCreate(root, name, flags);
-        }
-        case 'read': {
-          const { baseRead } = await import('./commands/base.mjs');
-          return baseRead(root, name);
-        }
-        case 'query': {
-          const { baseQuery } = await import('./commands/base.mjs');
-          return baseQuery(root, name, { view: flags.view });
-        }
-        default:
-          throw new Error('Usage: base <create|read|query> <name>');
-      }
-    },
-  },
-  // ── Canvas ──
-  {
-    name: 'canvas',
-    description: 'Manage JSON Canvas (.canvas) files',
-    usage: 'canvas <create|read|add-node|add-edge> <name>',
-    subcommands: {
-      create: {
-        mcpName: 'canvas_create',
-        description: 'Create a new canvas file',
-        mcpSchema: { name: { type: 'string', description: 'Canvas filename' } },
-        mcpRequired: ['name'],
-        async run(root, flags) {
-          const { canvasCreate } = await import('./commands/canvas.mjs');
-          return canvasCreate(root, flags.name);
-        },
-      },
-      read: {
-        mcpName: 'canvas_read',
-        description: 'Read and parse a canvas file',
-        mcpSchema: { name: { type: 'string', description: 'Canvas filename' } },
-        mcpRequired: ['name'],
-        async run(root, flags) {
-          const { canvasRead } = await import('./commands/canvas.mjs');
-          return canvasRead(root, flags.name);
-        },
-      },
-      'add-node': {
-        mcpName: 'canvas_add_node',
-        description: 'Add a node to a canvas (text, file, link, or group)',
-        mcpSchema: {
-          name: { type: 'string', description: 'Canvas filename' },
-          type: { type: 'string', enum: ['text', 'file', 'link', 'group'], description: 'Node type' },
-          text: { type: 'string', description: 'Text content (for text nodes)' },
-          file: { type: 'string', description: 'File path (for file nodes)' },
-          url: { type: 'string', description: 'URL (for link nodes)' },
-          label: { type: 'string', description: 'Label (for group nodes)' },
-          color: { type: 'string', description: 'Color (1-6 or hex)' },
-        },
-        mcpRequired: ['name'],
-        async run(root, flags) {
-          const { canvasAddNode } = await import('./commands/canvas.mjs');
-          return canvasAddNode(root, flags.name, flags);
-        },
-      },
-      'add-edge': {
-        mcpName: 'canvas_add_edge',
-        description: 'Add an edge between two nodes in a canvas',
-        mcpSchema: {
-          name: { type: 'string', description: 'Canvas filename' },
-          from: { type: 'string', description: 'Source node ID' },
-          to: { type: 'string', description: 'Target node ID' },
-          label: { type: 'string', description: 'Edge label' },
-          color: { type: 'string', description: 'Edge color' },
-        },
-        mcpRequired: ['name', 'from', 'to'],
-        async run(root, flags) {
-          const { canvasAddEdge } = await import('./commands/canvas.mjs');
-          return canvasAddEdge(root, flags.name, flags);
-        },
-      },
-    },
-    async run(root, flags, pos) {
-      const sub = pos[0];
-      const name = flags.name || pos[1];
-      switch (sub) {
-        case 'create': {
-          const { canvasCreate } = await import('./commands/canvas.mjs');
-          return canvasCreate(root, name);
-        }
-        case 'read': {
-          const { canvasRead } = await import('./commands/canvas.mjs');
-          return canvasRead(root, name);
-        }
-        case 'add-node': {
-          const { canvasAddNode } = await import('./commands/canvas.mjs');
-          return canvasAddNode(root, name, flags);
-        }
-        case 'add-edge': {
-          const { canvasAddEdge } = await import('./commands/canvas.mjs');
-          return canvasAddEdge(root, name, flags);
-        }
-        default:
-          throw new Error('Usage: canvas <create|read|add-node|add-edge> <name>');
-      }
-    },
-  },
-  // ── Smart Search ──
-  {
-    name: 'smart-search',
-    description: 'BM25 ranked search — better relevance than keyword matching',
-    usage: 'smart-search <query>',
-    mcpName: 'smart_search',
-    mcpSchema: {
-      query: { type: 'string', description: 'Search query (supports multi-word)' },
-      type: { type: 'string', description: 'Filter by note type' },
-      tag: { type: 'string', description: 'Filter by tag' },
-      status: { type: 'string', description: 'Filter by status' },
-      limit: { type: 'number', description: 'Max results (default: 20)' },
-    },
-    mcpRequired: ['query'],
-    async run(root, flags, pos) {
-      const { smartSearch } = await import('./commands/smart-search.mjs');
-      const query = flags.query || pos.join(' ');
-      if (!query) throw new Error('Usage: obsidian-agent smart-search <query>');
-      return smartSearch(root, query, { type: flags.type, tag: flags.tag, status: flags.status, limit: flags.limit });
-    },
-  },
-  // ── Embed Search ──
-  {
-    name: 'embed-search',
-    description: 'Semantic search using embeddings (Ollama or OpenAI, falls back to BM25)',
-    usage: 'embed-search <query>',
-    mcpName: 'embed_search',
-    mcpSchema: {
-      query: { type: 'string', description: 'Search query (natural language)' },
-      type: { type: 'string', description: 'Filter by note type' },
-      tag: { type: 'string', description: 'Filter by tag' },
-      provider: { type: 'string', enum: ['auto', 'ollama', 'openai', 'off'], description: 'Embedding provider (default: auto-detect)' },
-      limit: { type: 'number', description: 'Max results (default: 20)' },
-    },
-    mcpRequired: ['query'],
-    async run(root, flags, pos) {
-      const { embedSearch } = await import('./commands/embed-search.mjs');
-      const query = flags.query || pos.join(' ');
-      if (!query) throw new Error('Usage: obsidian-agent embed-search <query>');
-      return embedSearch(root, query, flags);
-    },
-  },
-  {
-    name: 'embed-status',
-    description: 'Show embedding provider status (Ollama, OpenAI)',
-    usage: 'embed-status',
-    mcpName: 'embed_status',
-    mcpSchema: {},
-    async run() {
-      const { embedStatus } = await import('./commands/embed-search.mjs');
-      const s = embedStatus();
-      console.log(`Ollama: ${s.ollama}`);
-      console.log(`OpenAI: ${s.openai}`);
-      console.log(`Active: ${s.active}`);
-      return s;
-    },
-  },
-  // ── Bridge ──
-  {
-    name: 'bridge-status',
-    description: 'Show Obsidian CLI bridge status (official CLI detection)',
-    usage: 'bridge-status',
-    mcpName: 'bridge_status',
-    mcpSchema: {},
-    async run() {
-      const { bridgeStatus } = await import('./obsidian-cli.mjs');
-      const s = bridgeStatus();
-      if (s.officialCli.available) {
-        console.log(`Obsidian CLI: ✓ detected (${s.officialCli.version})`);
-        console.log(`  Path: ${s.officialCli.path}`);
-      } else {
-        console.log(`Obsidian CLI: ✗ not available (${s.officialCli.reason})`);
-      }
-      console.log(`Bridge mode: ${s.envOverride}`);
-      console.log(`Bridgeable commands: ${s.bridgeableCommands.join(', ')}`);
-      return s;
     },
   },
 ];

@@ -3,7 +3,9 @@
  *
  * Implements Model Context Protocol (JSON-RPC 2.0 over stdio)
  * Zero dependencies — raw readline + JSON parsing
- * Tool definitions generated from registry.mjs (single source of truth)
+ *
+ * Tools and dispatch derived from registry — single source of truth.
+ * Resources expose vault index files. Prompts provide common operations.
  */
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
@@ -14,9 +16,76 @@ import { getMcpTools, getMcpDispatch } from './registry.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_VERSION = JSON.parse(readFileSync(resolve(__dirname, '..', 'package.json'), 'utf8')).version;
 
-// Generated from registry — single source of truth for CLI + MCP
+// Tools and dispatch from registry — no manual duplication
 const TOOLS = getMcpTools();
 const DISPATCH = getMcpDispatch();
+
+// ── MCP Resources ──────────────────────────────────────
+
+const RESOURCES = [
+  { uri: 'vault://index', name: 'Vault Index', description: 'Global vault index (_index.md)', mimeType: 'text/markdown' },
+  { uri: 'vault://tags', name: 'Tag Index', description: 'Tag-to-note mapping (_tags.md)', mimeType: 'text/markdown' },
+  { uri: 'vault://graph', name: 'Knowledge Graph', description: 'Relationship graph with TF-IDF suggestions (_graph.md)', mimeType: 'text/markdown' },
+];
+
+const RESOURCE_FILE_MAP = {
+  'vault://index': '_index.md',
+  'vault://tags': '_tags.md',
+  'vault://graph': '_graph.md',
+};
+
+// ── MCP Prompts ────────────────────────────────────────
+
+const PROMPTS = [
+  {
+    name: 'daily-journal',
+    description: 'Create or open today\'s journal entry',
+    arguments: [
+      { name: 'date', description: 'Date in YYYY-MM-DD format (default: today)', required: false },
+    ],
+  },
+  {
+    name: 'weekly-review',
+    description: 'Generate a weekly review summary',
+    arguments: [],
+  },
+  {
+    name: 'capture-idea',
+    description: 'Quick capture an idea to the vault',
+    arguments: [
+      { name: 'text', description: 'The idea text to capture', required: true },
+    ],
+  },
+];
+
+function buildPromptMessages(name, args = {}) {
+  switch (name) {
+    case 'daily-journal':
+      return {
+        messages: [{
+          role: 'user',
+          content: { type: 'text', text: `Create or open today's journal entry${args.date ? ` for ${args.date}` : ''}. Use the journal tool.` },
+        }],
+      };
+    case 'weekly-review':
+      return {
+        messages: [{
+          role: 'user',
+          content: { type: 'text', text: 'Generate a weekly review. Use the review tool to create a comprehensive summary of this week\'s activity.' },
+        }],
+      };
+    case 'capture-idea':
+      if (!args.text) throw new Error('Missing required argument: text');
+      return {
+        messages: [{
+          role: 'user',
+          content: { type: 'text', text: `Capture this idea: "${args.text}". Use the capture tool.` },
+        }],
+      };
+    default:
+      throw new Error(`Unknown prompt: ${name}`);
+  }
+}
 
 // ── Server class ─────────────────────────────────────
 
@@ -49,6 +118,17 @@ export class McpServer {
     }
   }
 
+  readResource(uri) {
+    const filename = RESOURCE_FILE_MAP[uri];
+    if (!filename) throw new Error(`Unknown resource: ${uri}`);
+    const filePath = resolve(this.vaultRoot, filename);
+    try {
+      return readFileSync(filePath, 'utf8');
+    } catch {
+      return '';
+    }
+  }
+
   handleMessage(msg) {
     const { id, method, params } = msg;
 
@@ -58,14 +138,15 @@ export class McpServer {
           jsonrpc: '2.0', id,
           result: {
             protocolVersion: '2024-11-05',
-            capabilities: { tools: {} },
-            serverInfo: { name: 'obsidian-agent', version: PKG_VERSION },
+            capabilities: { tools: {}, resources: {}, prompts: {} },
+            serverInfo: { name: 'clausidian', version: PKG_VERSION },
           },
         };
 
       case 'notifications/initialized':
         return null;
 
+      // ── Tools ──
       case 'tools/list':
         return { jsonrpc: '2.0', id, result: { tools: TOOLS } };
 
@@ -79,6 +160,39 @@ export class McpServer {
           jsonrpc: '2.0', id,
           error: { code: -32000, message: err.message },
         }));
+
+      // ── Resources ──
+      case 'resources/list':
+        return { jsonrpc: '2.0', id, result: { resources: RESOURCES } };
+
+      case 'resources/read': {
+        const uri = params?.uri;
+        try {
+          const content = this.readResource(uri);
+          return {
+            jsonrpc: '2.0', id,
+            result: {
+              contents: [{ uri, mimeType: 'text/markdown', text: content }],
+            },
+          };
+        } catch (err) {
+          return { jsonrpc: '2.0', id, error: { code: -32000, message: err.message } };
+        }
+      }
+
+      // ── Prompts ──
+      case 'prompts/list':
+        return { jsonrpc: '2.0', id, result: { prompts: PROMPTS } };
+
+      case 'prompts/get': {
+        const promptName = params?.name;
+        try {
+          const result = buildPromptMessages(promptName, params?.arguments || {});
+          return { jsonrpc: '2.0', id, result };
+        } catch (err) {
+          return { jsonrpc: '2.0', id, error: { code: -32000, message: err.message } };
+        }
+      }
 
       default:
         return {
@@ -113,5 +227,7 @@ export class McpServer {
         }
       }
     });
+
+    process.stderr.write('clausidian MCP server started\n');
   }
 }

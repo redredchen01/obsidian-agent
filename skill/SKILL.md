@@ -1,34 +1,24 @@
 ---
-name: obsidian-agent
+name: obsidian
+version: 1.0.0
 description: |
-  AI agent toolkit for Obsidian vaults — PARA structured knowledge management.
-  55+ MCP tools for journal, notes, search (keyword + BM25 + embedding),
-  review, graph, health, canvas, bases, and more.
-  Zero dependencies. Works headless (no Obsidian app required).
-  Bridges to Obsidian 1.12 official CLI when available.
+  Obsidian 知识库管理 — 通过 MCP 工具操作 PARA 结构 vault。
   Use when: "记笔记", "写日记", "搜知识库", "记录想法", "obsidian",
   "vault", "journal", "capture", "search notes", "weekly review",
   "知识管理", "查笔记", "整理笔记", "回顾", "log work"
-license: MIT
-compatibility: Designed for Claude Code, Cursor, Copilot, Cline, Windsurf, Codex
-metadata:
-  author: redredchen01
-  version: "1.5.0"
-  homepage: https://github.com/redredchen01/obsidian-agent
-  tools: 55+
 ---
 
 # /obsidian — Obsidian Vault 管理
 
-通过 obsidian-agent MCP 工具操作知识库。从任何项目目录都能用。
+通过 clausidian MCP 工具操作知识库。从任何项目目录都能用。
 
 ## Setup
 
-如果还没安装，运行 `obsidian-agent setup` 自动配置 MCP server + skill。
+如果还没安装，运行 `clausidian setup` 自动配置 MCP server + skill。
 
 ## Vault 基本信息
 
-- **路径:** 由 `$OA_VAULT` 环境变量指定（运行 `obsidian-agent setup` 时配置）
+- **路径:** 由 `$OA_VAULT` 环境变量指定（运行 `clausidian setup` 时配置）
 - **结构:** PARA — `areas/` `projects/` `resources/` `journal/` `ideas/`
 - **索引:** `_index.md` `_tags.md` `_graph.md`（自动维护）
 - **规范:** 完整 frontmatter。`[[filename]]` 链接（无 .md）。小写连字符文件名。
@@ -92,20 +82,9 @@ metadata:
 | 聚焦建议 | `focus` | `{}` — 按优先级建议下一步工作 |
 | 在 Obsidian 打开 | `open` | `{note?, reveal?}` — macOS only |
 | 剪贴板快捷笔记 | `quicknote` | `{prefix?}` — 从剪贴板捕获 |
-| BM25 智能搜索 | `smart_search` | `{query, type?, tag?, limit?}` — 多词语义匹配 |
-| 向量搜索 | `embed_search` | `{query, provider?}` — Ollama/OpenAI 嵌入搜索 |
-| 向量状态 | `embed_status` | `{}` — 检查嵌入提供商 |
-| 创建画布 | `canvas_create` | `{name}` — 创建 .canvas 文件 |
-| 读取画布 | `canvas_read` | `{name}` — 读取画布结构 |
-| 添加画布节点 | `canvas_add_node` | `{name, type, text?/file?/url?}` |
-| 添加画布连线 | `canvas_add_edge` | `{name, from, to, label?}` |
-| 创建 Base | `base_create` | `{name}` — 创建 .base 文件 |
-| 读取 Base | `base_read` | `{name}` — 读取 Base 结构 |
-| 查询 Base | `base_query` | `{name, view?}` — 按 Base 定义查询笔记 |
-| CLI 桥接状态 | `bridge_status` | `{}` — 检查官方 CLI 是否可用 |
-| 周回顾 | **CLI:** `obsidian-agent review` | |
-| 月回顾 | **CLI:** `obsidian-agent review monthly` | |
-| 导入笔记 | **CLI:** `obsidian-agent import <file>` | |
+| 周回顾 | **CLI:** `clausidian review` | |
+| 月回顾 | **CLI:** `clausidian review monthly` | |
+| 导入笔记 | **CLI:** `clausidian import <file>` | |
 
 ## 工作流模式
 
@@ -138,7 +117,7 @@ metadata:
 ### 4. 周回顾
 
 ```
-1. Bash: obsidian-agent review
+1. Bash: clausidian review
 2. list({type: "project", status: "active"})  — 活跃项目
 3. recent({days: 7})                          — 本周更新
 4. 读取生成的 review 并补充项目进展
@@ -147,7 +126,7 @@ metadata:
 ### 5. 月回顾
 
 ```
-1. Bash: obsidian-agent review monthly
+1. Bash: clausidian review monthly
 2. stats()                             — vault 统计
 3. list({type: "project"})             — 所有项目状态
 4. 读取生成的 review 并补充里程碑
@@ -227,20 +206,8 @@ metadata:
 2. open({reveal: true, note: "my-note"})— 在 Finder 中显示
 3. open()                               — 打开整个 vault
 4. quicknote()                          — 剪贴板内容 → idea 笔记
-5. obsidian-agent launchd install       — 安装定时任务 (daily backfill + weekly review)
-6. obsidian-agent launchd status        — 查看定时任务状态
-```
-
-## Obsidian CLI Bridge
-
-When Obsidian 1.12+ CLI is available, obsidian-agent automatically bridges supported
-commands (search, read, backlinks, etc.) to the official CLI for richer results.
-Unique features (health, graph, review, PARA, link, suggest, etc.) stay native.
-
-```bash
-obsidian-agent bridge-status         # Check bridge status
-OA_NO_OFFICIAL_CLI=1                 # Disable bridge (env var)
-obsidian-agent search foo --no-bridge # Skip bridge for one command
+5. clausidian launchd install       — 安装定时任务 (daily backfill + weekly review)
+6. clausidian launchd status        — 查看定时任务状态
 ```
 
 ## CLI Fallback
@@ -248,7 +215,7 @@ obsidian-agent search foo --no-bridge # Skip bridge for one command
 MCP 不支持的命令用 Bash（OA_VAULT 已通过 setup 配置）：
 
 ```bash
-obsidian-agent review                # 周回顾
-obsidian-agent review monthly        # 月回顾
-obsidian-agent hook daily-backfill   # 从 git 历史建日志
+clausidian review                # 周回顾
+clausidian review monthly        # 月回顾
+clausidian hook daily-backfill   # 从 git 历史建日志
 ```

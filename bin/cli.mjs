@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * obsidian-agent CLI — AI agent toolkit for Obsidian vaults
- * v1.2.0 — registry-based dispatch + Obsidian CLI bridge
+ * clausidian CLI — AI agent toolkit for Obsidian vaults
+ * v1.1.0 — registry-based dispatch
  */
 
 import { getCommand, getCommandNames } from '../src/registry.mjs';
@@ -52,7 +52,7 @@ async function main() {
     const { fileURLToPath } = await import('url');
     const pkgPath = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-    console.log(`obsidian-agent v${pkg.version}`);
+    console.log(`clausidian v${pkg.version}`);
     return;
   }
 
@@ -70,7 +70,7 @@ async function main() {
     const similar = names.filter(c => c.startsWith(command?.slice(0, 2) || '') || levenshtein(c, command) <= 2);
     console.error(`Unknown command: ${command}`);
     if (similar.length) console.error(`Did you mean: ${similar.join(', ')}?`);
-    else console.error('Run "obsidian-agent help" for usage.');
+    else console.error('Run "clausidian help" for usage.');
     process.exit(1);
   }
 
@@ -81,33 +81,24 @@ async function main() {
   if (jsonMode) console.log = () => {};
 
   let result;
-
-  // ── Obsidian CLI bridge: try official CLI for supported commands ──
-  if (command && command !== 'help' && command !== 'serve' && command !== 'setup' && !flags['no-bridge']) {
-    const { tryBridge } = await import('../src/obsidian-cli.mjs');
-    const bridge = tryBridge(command, positional, flags);
-    if (bridge.bridged) {
-      if (jsonMode) {
-        result = { output: bridge.result, via: bridge.via };
-      } else {
-        console.log(bridge.result);
-        result = { output: bridge.result, via: bridge.via };
-      }
-      if (jsonMode && result !== undefined) {
-        console.log = origLog;
-        console.log(JSON.stringify(result, null, 2));
-      }
-      if (flags.copy && result !== undefined) {
-        const { copyToClipboard } = await import('../src/clipboard.mjs');
-        const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-        if (copyToClipboard(text)) console.error('Copied to clipboard.');
-      }
-      process.exit(0);
+  if (cmd.subcommands) {
+    // Dispatch to subcommand
+    const subcommandName = positional[0];
+    const subcommand = cmd.subcommands[subcommandName];
+    if (!subcommand) {
+      const available = Object.keys(cmd.subcommands).join(', ');
+      console.error(`Unknown subcommand: ${subcommandName}`);
+      console.error(`Available: ${available}`);
+      process.exit(1);
     }
-    // Fallback to native implementation
+    // Remove subcommand from positional args
+    positional.shift();
+    result = await subcommand.run(resolveVault(flags), flags, positional);
+  } else if (cmd.run) {
+    result = await cmd.run(resolveVault(flags), flags, positional);
+  } else {
+    throw new Error(`Command ${command} has no run function or subcommands`);
   }
-
-  result = await cmd.run(resolveVault(flags), flags, positional);
 
   if (jsonMode && result !== undefined) {
     console.log = origLog;

@@ -46,7 +46,7 @@ export function daily(vaultRoot) {
 
   // Journal
   console.log(`Journal: ${journalExists ? 'exists' : 'not yet created'}`);
-  if (!journalExists) console.log(`  → obsidian-agent journal`);
+  if (!journalExists) console.log(`  → clausidian journal`);
 
   // Today's activity
   console.log(`\nToday: ${recentNotes.length} note(s) updated`);

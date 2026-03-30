@@ -11,7 +11,7 @@ export function move(vaultRoot, noteName, newType) {
   const idx = new IndexManager(vault);
 
   if (!noteName || !newType) {
-    throw new Error('Usage: obsidian-agent move <note-name> <new-type>');
+    throw new Error('Usage: clausidian move <note-name> <new-type>');
   }
 
   const validTypes = ['area', 'project', 'resource', 'idea'];

@@ -288,7 +288,7 @@ describe('commands (import)', () => {
       method: 'initialize',
       params: { protocolVersion: '2024-11-05' },
     });
-    assert.equal(init.result.serverInfo.name, 'obsidian-agent');
+    assert.equal(init.result.serverInfo.name, 'clausidian');
 
     const tools = server.handleMessage({
       jsonrpc: '2.0', id: 2,

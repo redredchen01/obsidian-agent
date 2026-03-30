@@ -70,19 +70,15 @@ function tagConclusions(content) {
 
 // ── session-stop: append session summary to today's journal ──
 
-export function sessionStop(vaultRoot, { scanRoot } = {}) {
+export function sessionStop(vaultRoot, options = {}) {
   const vault = new Vault(vaultRoot);
   const tpl = new TemplateEngine(vaultRoot);
   const idx = new IndexManager(vault);
   const date = todayStr();
 
-  // Read stdin (agent hook payload)
-  let stdin = '';
-  try { stdin = readFileSync('/dev/stdin', 'utf8'); } catch {}
-  let hookData = {};
-  try { hookData = JSON.parse(stdin); } catch {}
-
-  const reason = hookData.stop_reason;
+  // Extract payload (merged from stdin at registry level)
+  const { stop_reason, scanRoot } = options;
+  const reason = stop_reason;
   if (!reason || reason === 'unknown') {
     console.log(JSON.stringify({ status: 'skipped', date, reason: 'no valid stop_reason' }));
     return;
@@ -101,7 +97,7 @@ export function sessionStop(vaultRoot, { scanRoot } = {}) {
     notify('Obsidian Agent', `Session logged to ${date}`);
     console.log(JSON.stringify({ status: 'appended', date }));
   } else {
-    const root = scanRoot || dirname(vaultRoot);
+    const root = scanRoot || dirname(vaultRoot) || '.';
     const commits = getGitCommits(root, date);
     const summary = commits.length > 0
       ? `${commits.length} commits across ${new Set(commits.map(c => c.repo)).size} repos`
@@ -172,4 +168,129 @@ export function dailyBackfill(vaultRoot, { date, scanRoot, force } = {}) {
 
   notify('Obsidian Agent', `Backfill: journal/${d}.md (${commits.length} commits)`);
   console.log(JSON.stringify({ status: 'created', date: d, commits: commits.length }));
+}
+
+// ── Event-driven pipeline: note-created, note-updated, note-deleted, index-rebuilt ──
+
+function scoreRelatedness(note1, note2, tagIDF) {
+  let score = 0;
+  const shared = [];
+
+  // TF-IDF weighted tag overlap
+  for (const t of note1.tags) {
+    if (note2.tags.includes(t)) {
+      score += tagIDF[t] || 1;
+      shared.push(t);
+    }
+  }
+
+  // Simple keyword co-occurrence (if body available)
+  if (note1.body && note2.body) {
+    const words1 = new Set((note1.body.toLowerCase().match(/[a-z\u4e00-\u9fff]{3,}/g) || []).slice(0, 50));
+    const words2 = new Set((note2.body.toLowerCase().match(/[a-z\u4e00-\u9fff]{3,}/g) || []).slice(0, 50));
+    let overlap = 0;
+    for (const w of words1) {
+      if (words2.has(w)) overlap++;
+    }
+    score += Math.min(overlap * 0.1, 2);
+  }
+
+  return { score, shared };
+}
+
+export function noteCreated(vaultRoot, payload = {}) {
+  const vault = new Vault(vaultRoot);
+  const idx = new IndexManager(vault);
+  const noteName = payload.note || 'unknown';
+
+  try {
+    // Scan all notes to find related ones
+    const allNotes = vault.scanNotes({ includeBody: true });
+    const newNote = allNotes.find(n => n.file === noteName);
+    if (!newNote || newNote.tags.length === 0) {
+      console.log(JSON.stringify({ status: 'skipped', event: 'note-created', note: noteName, reason: 'no tags' }));
+      return;
+    }
+
+    // Build tag IDF
+    const nonJournal = allNotes.filter(n => n.dir !== 'journal' && n.tags.length > 0);
+    const tagDF = {};
+    for (const n of nonJournal) {
+      for (const t of n.tags) tagDF[t] = (tagDF[t] || 0) + 1;
+    }
+    const tagIDF = {};
+    for (const [tag, df] of Object.entries(tagDF)) {
+      tagIDF[tag] = Math.log(nonJournal.length / df);
+    }
+
+    // Find top related notes
+    const candidates = allNotes.filter(n => n.file !== noteName && n.dir !== 'journal' && !newNote.related.includes(n.file));
+    const scored = candidates.map(c => ({
+      file: c.file, summary: c.summary, ...scoreRelatedness(newNote, c, tagIDF)
+    })).filter(s => s.score >= 1.5 && s.shared.length >= 1)
+      .sort((a, b) => b.score - a.score);
+
+    const suggestions = scored.slice(0, 5);
+    if (suggestions.length > 0) {
+      console.log(JSON.stringify({
+        status: 'created',
+        event: 'note-created',
+        note: noteName,
+        suggestions: suggestions.map(s => ({ note: s.file, score: Math.round(s.score * 10) / 10, tags: s.shared }))
+      }));
+    } else {
+      console.log(JSON.stringify({ status: 'created', event: 'note-created', note: noteName, suggestions: [] }));
+    }
+  } catch (err) {
+    console.error(`[note-created error] ${err.message}`);
+  }
+}
+
+export function noteUpdated(vaultRoot, payload = {}) {
+  const vault = new Vault(vaultRoot);
+  const idx = new IndexManager(vault);
+  const noteName = payload.note || 'unknown';
+  const changes = payload.changes || {};
+
+  try {
+    // Only re-index if tags or body changed
+    if (changes.tags || changes.body) {
+      const result = idx.rebuildGraph();
+      console.log(JSON.stringify({
+        status: 'updated',
+        event: 'note-updated',
+        note: noteName,
+        graphRebuilt: true,
+        suggestedLinks: result.suggestedLinks
+      }));
+    } else {
+      console.log(JSON.stringify({ status: 'updated', event: 'note-updated', note: noteName }));
+    }
+  } catch (err) {
+    console.error(`[note-updated error] ${err.message}`);
+  }
+}
+
+export function noteDeleted(vaultRoot, payload = {}) {
+  const vault = new Vault(vaultRoot);
+  const idx = new IndexManager(vault);
+  const noteName = payload.note || 'unknown';
+
+  try {
+    // Rebuild graph to remove deleted note references
+    idx.rebuildGraph();
+    console.log(JSON.stringify({ status: 'deleted', event: 'note-deleted', note: noteName, graphRebuilt: true }));
+  } catch (err) {
+    console.error(`[note-deleted error] ${err.message}`);
+  }
+}
+
+export function indexRebuilt(vaultRoot, payload = {}) {
+  try {
+    // Optional: notify Telegram or other services
+    // For now, just log the event
+    console.log(JSON.stringify({ status: 'rebuilt', event: 'index-rebuilt', timestamp: payload.timestamp || new Date().toISOString() }));
+  } catch (err) {
+    console.error(`[index-rebuilt error] ${err.message}`);
+  }
 }

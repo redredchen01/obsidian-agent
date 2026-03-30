@@ -7,7 +7,7 @@ export function read(vaultRoot, noteName, { section } = {}) {
   const vault = new Vault(vaultRoot);
 
   if (!noteName) {
-    throw new Error('Usage: obsidian-agent read <note-name> [--section HEADING]');
+    throw new Error('Usage: clausidian read <note-name> [--section HEADING]');
   }
 
   const note = vault.findNote(noteName);

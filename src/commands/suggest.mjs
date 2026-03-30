@@ -30,7 +30,7 @@ export function suggest(vaultRoot, { limit = 10 } = {}) {
       priority: 'medium',
       note: o.file,
       action: `Link [[${o.file}]] to related notes or archive it`,
-      command: `obsidian-agent link`,
+      command: `clausidian link`,
     });
   }
 
@@ -48,7 +48,7 @@ export function suggest(vaultRoot, { limit = 10 } = {}) {
       priority: 'low',
       note: s.file,
       action: `Update or archive [[${s.file}]] (${days} days stale)`,
-      command: `obsidian-agent update "${s.file}" --summary "..."`,
+      command: `clausidian update "${s.file}" --summary "..."`,
     });
   }
 
@@ -60,7 +60,7 @@ export function suggest(vaultRoot, { limit = 10 } = {}) {
       priority: 'medium',
       note: noSummary.map(n => n.file).slice(0, 5).join(', '),
       action: `${noSummary.length} note(s) missing summaries — summaries improve search quality`,
-      command: `obsidian-agent update "<note>" --summary "..."`,
+      command: `clausidian update "<note>" --summary "..."`,
     });
   }
 
@@ -72,7 +72,7 @@ export function suggest(vaultRoot, { limit = 10 } = {}) {
       priority: 'low',
       note: noTags.map(n => n.file).slice(0, 5).join(', '),
       action: `${noTags.length} note(s) have no tags`,
-      command: `obsidian-agent batch tag --add "<tag>"`,
+      command: `clausidian batch tag --add "<tag>"`,
     });
   }
 
@@ -90,7 +90,7 @@ export function suggest(vaultRoot, { limit = 10 } = {}) {
           priority: 'low',
           note: `${a} (${tagMap[a]}) / ${b} (${tagMap[b]})`,
           action: `Consider merging tags "${a}" and "${b}"`,
-          command: `obsidian-agent tag rename "${tagMap[a] < tagMap[b] ? a : b}" "${tagMap[a] >= tagMap[b] ? a : b}"`,
+          command: `clausidian tag rename "${tagMap[a] < tagMap[b] ? a : b}" "${tagMap[a] >= tagMap[b] ? a : b}"`,
         });
       }
     }
@@ -113,7 +113,7 @@ export function suggest(vaultRoot, { limit = 10 } = {}) {
       priority: 'high',
       note: '',
       action: `${brokenCount} broken link(s) found`,
-      command: `obsidian-agent relink`,
+      command: `clausidian relink`,
     });
   }
 

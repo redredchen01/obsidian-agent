@@ -11,7 +11,7 @@ export function deleteNote(vaultRoot, noteName) {
   const idx = new IndexManager(vault);
 
   if (!noteName) {
-    throw new Error('Usage: obsidian-agent delete <note-name>');
+    throw new Error('Usage: clausidian delete <note-name>');
   }
 
   const note = vault.findNote(noteName);

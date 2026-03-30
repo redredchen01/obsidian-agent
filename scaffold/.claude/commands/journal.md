@@ -1,6 +1,6 @@
 Create or open today's journal entry.
 
-Run: `obsidian-agent journal`
+Run: `clausidian journal`
 
 If the CLI is not available, follow these manual steps:
 1. Calculate today's date (YYYY-MM-DD) and weekday

@@ -12,7 +12,7 @@ export function importNotes(vaultRoot, inputPath) {
   const idx = new IndexManager(vault);
 
   if (!inputPath) {
-    throw new Error('Usage: obsidian-agent import <file.json|file.md>');
+    throw new Error('Usage: clausidian import <file.json|file.md>');
   }
 
   const fullPath = resolve(inputPath);

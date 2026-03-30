@@ -11,7 +11,7 @@ export function merge(vaultRoot, sourceName, targetName) {
   const idx = new IndexManager(vault);
 
   if (!sourceName || !targetName) {
-    throw new Error('Usage: obsidian-agent merge <source-note> <target-note>');
+    throw new Error('Usage: clausidian merge <source-note> <target-note>');
   }
 
   const source = vault.findNote(sourceName);

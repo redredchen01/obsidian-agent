@@ -10,7 +10,7 @@ export function update(vaultRoot, noteName, { status, tags, summary, tag } = {})
   const idx = new IndexManager(vault);
 
   if (!noteName) {
-    throw new Error('Usage: obsidian-agent update <note-name> [--status STATUS] [--tags TAG1,TAG2] [--summary TEXT]');
+    throw new Error('Usage: clausidian update <note-name> [--status STATUS] [--tags TAG1,TAG2] [--summary TEXT]');
   }
 
   const note = vault.findNote(noteName);

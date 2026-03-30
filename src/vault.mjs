@@ -15,7 +15,7 @@ export class Vault {
   }
 
   _detectDirs() {
-    const configPath = this.path('.obsidian-agent.json');
+    const configPath = this.path('.clausidian.json');
     if (existsSync(configPath)) {
       try {
         const config = JSON.parse(readFileSync(configPath, 'utf8'));

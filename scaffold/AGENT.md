@@ -1,104 +1,89 @@
 # Obsidian Knowledge Base — Agent Instructions
 
-This is an agent-managed Obsidian vault. You (the AI agent) operate this vault via the `obsidian-agent` CLI.
+This is an agent-managed Obsidian vault. You (the AI agent) operate this vault via the `clausidian` CLI.
 
 ## Quick Start
 
 ```bash
 # Read a note
-obsidian-agent read "my-project"
-obsidian-agent read "my-project" --section "TODO"
+clausidian read "my-project"
+clausidian read "my-project" --section "TODO"
 
 # Check what's in the vault
-obsidian-agent list
-obsidian-agent recent                    # last 7 days
-obsidian-agent stats                     # vault overview
+clausidian list
+clausidian recent                    # last 7 days
+clausidian stats                     # vault overview
 
 # Create
-obsidian-agent journal                   # today's journal
-obsidian-agent note "Title" project --tags "backend,api"
-obsidian-agent capture "Quick idea text"
+clausidian journal                   # today's journal
+clausidian note "Title" project --tags "backend,api"
+clausidian capture "Quick idea text"
 
 # Search & discover
-obsidian-agent search "keyword"          # full-text search
-obsidian-agent backlinks "note-name"     # what links here?
-obsidian-agent orphans                   # unlinked notes
+clausidian search "keyword"          # full-text search
+clausidian backlinks "note-name"     # what links here?
+clausidian orphans                   # unlinked notes
 
 # Edit existing notes
-obsidian-agent patch "note" --heading "TODO" --append "- [ ] New task"
-obsidian-agent update "note" --status active --summary "Updated"
-obsidian-agent archive "old-note"
-obsidian-agent delete "obsolete-note"
+clausidian patch "note" --heading "TODO" --append "- [ ] New task"
+clausidian update "note" --status active --summary "Updated"
+clausidian archive "old-note"
+clausidian delete "obsolete-note"
 
 # Tags
-obsidian-agent tag list
-obsidian-agent tag rename "old" "new"
+clausidian tag list
+clausidian tag rename "old" "new"
 
 # Rename / Move / Merge
-obsidian-agent rename "note" "New Title"  # rename + update refs
-obsidian-agent move "note" project        # change type/directory
-obsidian-agent merge "source" "target"    # combine two notes
+clausidian rename "note" "New Title"  # rename + update refs
+clausidian move "note" project        # change type/directory
+clausidian merge "source" "target"    # combine two notes
 
 # Batch operations
-obsidian-agent batch tag --type idea --add "review"
-obsidian-agent batch archive --tag "deprecated"
-obsidian-agent batch update --type project --set-status active
+clausidian batch tag --type idea --add "review"
+clausidian batch archive --tag "deprecated"
+clausidian batch update --type project --set-status active
 
 # Export / Import
-obsidian-agent export backup.json
-obsidian-agent import notes.json
+clausidian export backup.json
+clausidian import notes.json
 
 # Reviews
-obsidian-agent review                    # weekly
-obsidian-agent review monthly
+clausidian review                    # weekly
+clausidian review monthly
 
 # Smart linking & quality
-obsidian-agent link --dry-run            # preview missing links
-obsidian-agent link                      # auto-link related notes
-obsidian-agent validate                  # check frontmatter issues
-obsidian-agent relink --dry-run          # preview broken link fixes
-obsidian-agent relink                    # auto-fix broken links
-obsidian-agent timeline --days 7         # recent activity feed
+clausidian link --dry-run            # preview missing links
+clausidian link                      # auto-link related notes
+clausidian validate                  # check frontmatter issues
+clausidian relink --dry-run          # preview broken link fixes
+clausidian relink                    # auto-fix broken links
+clausidian timeline --days 7         # recent activity feed
 
 # Pin favorites
-obsidian-agent pin "important-note"
-obsidian-agent pin list
-obsidian-agent unpin "important-note"
+clausidian pin "important-note"
+clausidian pin list
+clausidian unpin "important-note"
 
 # Graph & discovery
-obsidian-agent neighbors "note" --depth 3 # connected notes
-obsidian-agent random 3                  # serendipitous review
-obsidian-agent focus                     # what to work on next
+clausidian neighbors "note" --depth 3 # connected notes
+clausidian random 3                  # serendipitous review
+clausidian focus                     # what to work on next
 
 # Stats & reporting
-obsidian-agent count                     # word/line statistics
-obsidian-agent agenda                    # pending TODOs
-obsidian-agent changelog --days 14       # recent changes
-obsidian-agent daily                     # daily dashboard
-obsidian-agent suggest                   # improvement suggestions
-
-# Smart & semantic search (v1.3+)
-obsidian-agent smart-search "API design" # BM25 ranked search
-obsidian-agent embed-search "how to..."  # semantic via Ollama/OpenAI
-obsidian-agent embed-status              # check embedding providers
-
-# Canvas & Bases (v1.3+)
-obsidian-agent canvas create "board"     # create .canvas file
-obsidian-agent canvas add-node "board" --type text --text "Note"
-obsidian-agent canvas add-edge "board" --from id1 --to id2
-obsidian-agent canvas read "board"
-obsidian-agent base create "tracker"     # create .base file
-obsidian-agent base query "tracker"      # query notes with filters
-obsidian-agent base read "tracker"
+clausidian count                     # word/line statistics
+clausidian agenda                    # pending TODOs
+clausidian changelog --days 14       # recent changes
+clausidian daily                     # daily dashboard
+clausidian suggest                   # improvement suggestions
 
 # Maintenance
-obsidian-agent sync                      # rebuild indices
-obsidian-agent health                    # vault health score
-obsidian-agent graph                     # Mermaid knowledge graph
-obsidian-agent broken-links              # find broken [[links]]
-obsidian-agent duplicates                # find similar notes
-obsidian-agent search "pattern" --regex  # regex search
-obsidian-agent bridge-status             # Obsidian CLI bridge info
+clausidian sync                      # rebuild indices
+clausidian health                    # vault health score
+clausidian graph                     # Mermaid knowledge graph
+clausidian broken-links              # find broken [[links]]
+clausidian duplicates                # find similar notes
+clausidian search "pattern" --regex  # regex search
 ```
 
 All commands support `--json` for machine-readable output.
@@ -137,5 +122,3 @@ If you edit files directly instead of using the CLI:
 
 - `OA_VAULT` — Vault path (so you don't need `--vault` every time)
 - `OA_TIMEZONE` — Timezone for dates (default: UTC)
-- `OA_NO_OFFICIAL_CLI` — Disable Obsidian CLI bridge (set to 1)
-- `OA_OPENAI_KEY` — OpenAI API key for embedding search

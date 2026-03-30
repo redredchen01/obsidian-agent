@@ -64,16 +64,16 @@ All templates are in `templates/` with `{{PLACEHOLDER}}` syntax. When creating n
 
 ## Using the CLI (recommended)
 
-Instead of manual file operations, agents can use the `obsidian-agent` CLI:
+Instead of manual file operations, agents can use the `clausidian` CLI:
 
 ```bash
-obsidian-agent journal              # Create/open today's journal
-obsidian-agent note "Title" type    # Create a note (auto-links related notes)
-obsidian-agent capture "idea"       # Quick idea capture
-obsidian-agent search "keyword"     # Search notes
-obsidian-agent list [type]          # List notes
-obsidian-agent review               # Generate weekly review
-obsidian-agent sync                 # Rebuild indices
+clausidian journal              # Create/open today's journal
+clausidian note "Title" type    # Create a note (auto-links related notes)
+clausidian capture "idea"       # Quick idea capture
+clausidian search "keyword"     # Search notes
+clausidian list [type]          # List notes
+clausidian review               # Generate weekly review
+clausidian sync                 # Rebuild indices
 ```
 
 The CLI handles frontmatter, linking, and index updates automatically.

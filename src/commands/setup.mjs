@@ -15,8 +15,8 @@ export function setup(vaultPath) {
 
   // 1. Verify vault exists
   if (!existsSync(join(vault, '_index.md')) && !existsSync(join(vault, 'AGENT.md'))) {
-    console.log(`"${vault}" doesn't look like an obsidian-agent vault.`);
-    console.log('Run: obsidian-agent init <path> first.');
+    console.log(`"${vault}" doesn't look like an clausidian vault.`);
+    console.log('Run: clausidian init <path> first.');
     return { status: 'error', reason: 'not a vault' };
   }
 
@@ -39,25 +39,25 @@ export function setup(vaultPath) {
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
 
-  mcpConfig.mcpServers['obsidian-agent'] = {
-    command: 'obsidian-agent',
+  mcpConfig.mcpServers['clausidian'] = {
+    command: 'clausidian',
     args: ['serve', '--vault', vault],
   };
   if (!existsSync(dirname(mcpPath))) mkdirSync(dirname(mcpPath), { recursive: true });
   writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2) + '\n');
-  results.push(`MCP server configured: obsidian-agent serve --vault "${vault}"`);
+  results.push(`MCP server configured: clausidian serve --vault "${vault}"`);
 
   // 4. Set OA_VAULT in shell profile (suggest, don't force)
   const shellNote = `export OA_VAULT="${vault}"`;
 
-  console.log('\nobsidian-agent setup complete!\n');
+  console.log('\nclausidian setup complete!\n');
   for (const r of results) console.log(`  ✓ ${r}`);
   console.log(`\nTo set OA_VAULT permanently, add to your shell profile:`);
   console.log(`  ${shellNote}\n`);
   console.log('Next steps:');
   console.log('  1. Restart Claude Code (to load MCP server)');
   console.log('  2. Type /obsidian in any project to manage your vault');
-  console.log('  3. Try: obsidian-agent journal\n');
+  console.log('  3. Try: clausidian journal\n');
 
   return { status: 'ok', vault, results };
 }

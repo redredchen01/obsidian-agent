@@ -1,21 +1,17 @@
 # Obsidian Vault — Cursor Rules
 
-This is an agent-managed Obsidian vault. Use the `obsidian-agent` CLI (55+ commands) for all vault operations.
+This is an agent-managed Obsidian vault. Use the `clausidian` CLI for all vault operations.
 
-## Key Commands
+## Commands
 
 ```bash
-obsidian-agent journal              # Create/open today's journal
-obsidian-agent note "Title" type    # Create a note (area/project/resource/idea)
-obsidian-agent capture "idea"       # Quick idea capture
-obsidian-agent search "keyword"     # Keyword search (supports --regex)
-obsidian-agent smart-search "query" # BM25 ranked search (multi-word queries)
-obsidian-agent embed-search "query" # Semantic search (Ollama/OpenAI)
-obsidian-agent list [type]          # List notes
-obsidian-agent review               # Generate weekly review
-obsidian-agent sync                 # Rebuild indices
-obsidian-agent canvas create "name" # Create JSON Canvas
-obsidian-agent base query "name"    # Query notes via Base filters
+clausidian journal              # Create/open today's journal
+clausidian note "Title" type    # Create a note (area/project/resource/idea)
+clausidian capture "idea"       # Quick idea capture
+clausidian search "keyword"     # Search notes
+clausidian list [type]          # List notes
+clausidian review               # Generate weekly review
+clausidian sync                 # Rebuild indices
 ```
 
 ## Rules
@@ -24,5 +20,5 @@ obsidian-agent base query "name"    # Query notes via Base filters
 - All notes need complete YAML frontmatter (title, type, tags, created, updated, status, summary)
 - Use `[[filename]]` for internal links (no `.md` extension)
 - File names: lowercase with hyphens
-- After manual edits, run `obsidian-agent sync` to rebuild indices
-- Check `AGENT.md` for full command reference (55+ commands)
+- After manual edits, run `clausidian sync` to rebuild indices
+- Check `AGENT.md` for full instructions

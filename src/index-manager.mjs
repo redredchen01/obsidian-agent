@@ -42,17 +42,28 @@ export class IndexManager {
   rebuildGraph(notes) {
     if (!notes) notes = this.vault.scanNotes({ includeBody: true });
     const today = todayStr();
-    let content = `---\ntitle: Knowledge Graph\ntype: index\nupdated: ${today}\n---\n\n# Knowledge Graph\n\n| Source | Links To | Relation |\n|--------|----------|----------|\n`;
+    // Build note lookup for strength calculation
+    const noteMap = new Map();
+    for (const n of notes) noteMap.set(n.file, n);
+
+    let content = `---\ntitle: Knowledge Graph\ntype: index\nupdated: ${today}\n---\n\n# Knowledge Graph\n\n| Source | Links To | Strength |\n|--------|----------|----------|\n`;
 
     let relCount = 0;
     for (const note of notes) {
       for (const rel of note.related) {
-        content += `| [[${note.file}]] | [[${rel}]] | related |\n`;
+        const target = noteMap.get(rel);
+        let strength = 'weak';
+        if (target) {
+          const shared = note.tags.filter(t => target.tags.includes(t)).length;
+          if (shared >= 2) strength = 'strong';
+          else if (shared >= 1) strength = 'medium';
+        }
+        content += `| [[${note.file}]] | [[${rel}]] | ${strength} |\n`;
         relCount++;
       }
       if (note.dir === 'journal' && note.file.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        content += `| [[${note.file}]] | [[${prevDate(note.file)}]] | nav-prev |\n`;
-        content += `| [[${note.file}]] | [[${nextDate(note.file)}]] | nav-next |\n`;
+        content += `| [[${note.file}]] | [[${prevDate(note.file)}]] | nav |\n`;
+        content += `| [[${note.file}]] | [[${nextDate(note.file)}]] | nav |\n`;
       }
     }
 

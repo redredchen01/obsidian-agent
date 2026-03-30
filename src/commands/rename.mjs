@@ -11,7 +11,7 @@ export function rename(vaultRoot, noteName, newTitle) {
   const idx = new IndexManager(vault);
 
   if (!noteName || !newTitle) {
-    throw new Error('Usage: obsidian-agent rename <note-name> <new-title>');
+    throw new Error('Usage: clausidian rename <note-name> <new-title>');
   }
 
   const note = vault.findNote(noteName);

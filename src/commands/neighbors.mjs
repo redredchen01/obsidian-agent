@@ -7,7 +7,7 @@ export function neighbors(vaultRoot, noteName, { depth = 2 } = {}) {
   const vault = new Vault(vaultRoot);
 
   if (!noteName) {
-    throw new Error('Usage: obsidian-agent neighbors <note-name> [--depth N]');
+    throw new Error('Usage: clausidian neighbors <note-name> [--depth N]');
   }
 
   const note = vault.findNote(noteName);

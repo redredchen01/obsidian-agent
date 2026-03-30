@@ -71,7 +71,7 @@ updated: ${new Date().toISOString().slice(0, 10)}
 
 # Tags Index
 
-(Run \`obsidian-agent sync\` to populate)
+(Run \`clausidian sync\` to populate)
 `);
   }
 
@@ -85,7 +85,7 @@ updated: ${new Date().toISOString().slice(0, 10)}
 
 # Knowledge Graph
 
-(Run \`obsidian-agent sync\` to populate)
+(Run \`clausidian sync\` to populate)
 `);
   }
 
@@ -131,9 +131,9 @@ updated: ${new Date().toISOString().slice(0, 10)}
   console.log('Next steps:');
   console.log('  1. Open the vault in Obsidian');
   console.log('  2. Start your AI agent in this directory');
-  console.log('  3. The agent reads AGENT.md and uses `obsidian-agent` CLI');
+  console.log('  3. The agent reads AGENT.md and uses `clausidian` CLI');
   console.log('');
-  console.log('Try: obsidian-agent journal');
+  console.log('Try: clausidian journal');
 }
 
 function copyRecursive(src, dest) {

@@ -8,7 +8,7 @@ export function patch(vaultRoot, noteName, { heading, append, prepend, replace }
   const vault = new Vault(vaultRoot);
 
   if (!noteName || !heading) {
-    throw new Error('Usage: obsidian-agent patch <note> --heading "Section" [--append|--prepend|--replace TEXT]');
+    throw new Error('Usage: clausidian patch <note> --heading "Section" [--append|--prepend|--replace TEXT]');
   }
 
   const note = vault.findNote(noteName);

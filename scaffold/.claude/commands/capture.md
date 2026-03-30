@@ -1,6 +1,6 @@
 Quick capture an idea.
 
-Run: `obsidian-agent capture "<idea text>"`
+Run: `clausidian capture "<idea text>"`
 
 If the CLI is not available:
 1. Extract a title from the idea text

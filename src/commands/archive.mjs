@@ -10,7 +10,7 @@ export function archive(vaultRoot, noteName) {
   const idx = new IndexManager(vault);
 
   if (!noteName) {
-    throw new Error('Usage: obsidian-agent archive <note-name>');
+    throw new Error('Usage: clausidian archive <note-name>');
   }
 
   const note = vault.findNote(noteName);

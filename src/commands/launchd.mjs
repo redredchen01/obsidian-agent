@@ -1,9 +1,12 @@
 /**
  * launchd — install/uninstall macOS LaunchAgents for automated vault maintenance
  *
- * Agents installed:
- *   - com.obsidian-agent.daily-backfill  (daily at 23:30)
- *   - com.obsidian-agent.weekly-review   (Sunday at 20:00)
+ * NOTE: Deprecated in favor of com.dex.obsidian-* system which uses scripts in
+ * /Users/dex/YD 2026/scripts/obsidian-*.sh (daily/weekly/monthly)
+ *
+ * Legacy agents (preserved for reference):
+ *   - com.clausidian.daily-backfill  (daily at 23:30)
+ *   - com.clausidian.weekly-review   (Sunday at 20:00)
  */
 import { existsSync, writeFileSync, unlinkSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -12,16 +15,16 @@ import { execSync } from 'child_process';
 import { resolve } from 'path';
 
 const AGENTS = {
-  'com.obsidian-agent.daily-backfill': {
-    label: 'com.obsidian-agent.daily-backfill',
+  'com.clausidian.daily-backfill': {
+    label: 'com.clausidian.daily-backfill',
     description: 'Daily journal backfill from git history',
     hour: 23,
     minute: 30,
     weekday: null, // every day
     args: (vault, scanRoot) => ['hook', 'daily-backfill', '--vault', vault, '--scan-root', scanRoot],
   },
-  'com.obsidian-agent.weekly-review': {
-    label: 'com.obsidian-agent.weekly-review',
+  'com.clausidian.weekly-review': {
+    label: 'com.clausidian.weekly-review',
     description: 'Weekly review generation',
     hour: 20,
     minute: 0,
@@ -40,9 +43,9 @@ function plistPath(label) {
 
 function whichBin() {
   try {
-    return execSync('which obsidian-agent', { encoding: 'utf8' }).trim();
+    return execSync('which clausidian', { encoding: 'utf8' }).trim();
   } catch {
-    return 'obsidian-agent';
+    return 'clausidian';
   }
 }
 
@@ -77,9 +80,9 @@ ${programArgs}
   <key>StartCalendarInterval</key>
 ${calendarInterval}
   <key>StandardOutPath</key>
-  <string>${join(homedir(), '.obsidian-agent', 'launchd.log')}</string>
+  <string>${join(homedir(), '.clausidian', 'launchd.log')}</string>
   <key>StandardErrorPath</key>
-  <string>${join(homedir(), '.obsidian-agent', 'launchd.err')}</string>
+  <string>${join(homedir(), '.clausidian', 'launchd.err')}</string>
   <key>RunAtLoad</key>
   <false/>
   <key>EnvironmentVariables</key>
@@ -104,7 +107,7 @@ export function launchdInstall(vaultPath, { scanRoot } = {}) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
   // Create log directory
-  const logDir = join(homedir(), '.obsidian-agent');
+  const logDir = join(homedir(), '.clausidian');
   if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
 
   const installed = [];
@@ -179,7 +182,7 @@ export function launchdStatus() {
   }
 
   // Show log tail if exists
-  const logPath = join(homedir(), '.obsidian-agent', 'launchd.log');
+  const logPath = join(homedir(), '.clausidian', 'launchd.log');
   if (existsSync(logPath)) {
     try {
       const log = readFileSync(logPath, 'utf8');
@@ -192,4 +195,16 @@ export function launchdStatus() {
   }
 
   return { status: 'ok', agents };
+}
+
+// ── Router for registry ──
+export function launchd(vaultRoot, cmd, flags) {
+  if (cmd === 'install') {
+    return launchdInstall(vaultRoot, flags);
+  } else if (cmd === 'uninstall') {
+    return launchdUninstall();
+  } else if (cmd === 'status') {
+    return launchdStatus();
+  }
+  throw new Error(`Unknown launchd command: ${cmd}\nAvailable: install, uninstall, status`);
 }

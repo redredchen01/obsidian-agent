@@ -9,7 +9,7 @@ export function pin(vaultRoot, noteName) {
   const vault = new Vault(vaultRoot);
 
   if (!noteName) {
-    throw new Error('Usage: obsidian-agent pin <note-name>');
+    throw new Error('Usage: clausidian pin <note-name>');
   }
 
   const note = vault.findNote(noteName);
@@ -40,7 +40,7 @@ export function unpin(vaultRoot, noteName) {
   const vault = new Vault(vaultRoot);
 
   if (!noteName) {
-    throw new Error('Usage: obsidian-agent unpin <note-name>');
+    throw new Error('Usage: clausidian unpin <note-name>');
   }
 
   const note = vault.findNote(noteName);

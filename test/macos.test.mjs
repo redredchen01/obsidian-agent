@@ -89,7 +89,7 @@ describe('clipboard utility', () => {
     if (!isMac) return; // skip on non-mac
     const { copyToClipboard } = await import('../src/clipboard.mjs');
     const { execSync } = await import('child_process');
-    const testStr = `obsidian-agent-test-${Date.now()}`;
+    const testStr = `clausidian-test-${Date.now()}`;
     const ok = copyToClipboard(testStr);
     assert.equal(ok, true);
     const readBack = execSync('pbpaste', { encoding: 'utf8' });
@@ -118,7 +118,7 @@ describe('launchd command', () => {
     const result = launchdStatus();
     assert.equal(result.status, 'ok');
     assert.equal(result.agents.length, 2);
-    assert.ok(result.agents[0].label.includes('obsidian-agent'));
+    assert.ok(result.agents[0].label.includes('clausidian'));
     assert.ok(result.agents[0].schedule);
   });
 });

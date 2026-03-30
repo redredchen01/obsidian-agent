@@ -1,6 +1,6 @@
 Generate this week's review.
 
-Run: `obsidian-agent review`
+Run: `clausidian review`
 
 If the CLI is not available:
 1. Calculate this week's date range (Monday to Sunday)

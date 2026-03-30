@@ -2,7 +2,7 @@ Create a new note.
 
 Usage: `<title> <type>` where type is area/project/resource/idea
 
-Run: `obsidian-agent note "<title>" <type>`
+Run: `clausidian note "<title>" <type>`
 
 If the CLI is not available, follow these manual steps:
 1. Read `CONVENTIONS.md`

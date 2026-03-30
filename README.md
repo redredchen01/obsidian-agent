@@ -1,160 +1,160 @@
-# obsidian-agent
+# Clausidian
 
 CLI toolkit for AI agents to manage Obsidian vaults. Zero dependencies. Works with **any** AI agent — Claude Code, Cursor, Copilot, Cline, Windsurf, Codex, and more.
 
 ## Why
 
-AI agents are great at managing knowledge, but they need structure. `obsidian-agent` provides:
+AI agents are great at managing knowledge, but they need structure. `clausidian` provides:
 
 - **Structured vault** with frontmatter conventions, templates, and auto-linking
 - **CLI interface** that any agent can call — no agent-specific integration needed
 - **Automatic indices** — tag index, knowledge graph, directory indexes
 - **Agent configs** generated for Claude Code, Cursor, Copilot out of the box
 
-Your agent reads the vault's `AGENT.md`, learns the conventions, and uses `obsidian-agent` CLI to create notes, journals, reviews — all with proper metadata and bidirectional links.
+Your agent reads the vault's `AGENT.md`, learns the conventions, and uses `clausidian` CLI to create notes, journals, reviews — all with proper metadata and bidirectional links.
 
 ## Install
 
 ```bash
-npm install -g obsidian-agent
+npm install -g clausidian
 ```
 
 ## Quick Start
 
 ```bash
 # Install
-npm install -g obsidian-agent
+npm install -g clausidian
 
 # Initialize a new vault
-obsidian-agent init ~/my-vault
+clausidian init ~/my-vault
 cd ~/my-vault
 
 # Setup Claude Code integration (MCP server + /obsidian skill)
-obsidian-agent setup ~/my-vault
+clausidian setup ~/my-vault
 
 # Create today's journal
-obsidian-agent journal
+clausidian journal
 
 # Create a project note
-obsidian-agent note "Build API" project --tags "backend,api"
+clausidian note "Build API" project --tags "backend,api"
 
 # Capture an idea
-obsidian-agent capture "Use vector search for note retrieval"
+clausidian capture "Use vector search for note retrieval"
 
 # Search notes
-obsidian-agent search "API" --type resource
+clausidian search "API" --type resource
 
 # List active projects
-obsidian-agent list project --status active
+clausidian list project --status active
 
 # Generate weekly review
-obsidian-agent review
+clausidian review
 
 # Generate monthly review
-obsidian-agent review monthly
+clausidian review monthly
 
 # What links to this note?
-obsidian-agent backlinks "build-api"
+clausidian backlinks "build-api"
 
 # Update a note's metadata
-obsidian-agent update "build-api" --status active --summary "Core API"
+clausidian update "build-api" --status active --summary "Core API"
 
 # Archive a completed project
-obsidian-agent archive "old-project"
+clausidian archive "old-project"
 
 # Vault statistics
-obsidian-agent stats
+clausidian stats
 
 # Generate Mermaid knowledge graph
-obsidian-agent graph
+clausidian graph
 
 # Find orphan notes (no inbound links)
-obsidian-agent orphans
+clausidian orphans
 
 # Tag management
-obsidian-agent tag list
-obsidian-agent tag rename "old-tag" "new-tag"
+clausidian tag list
+clausidian tag rename "old-tag" "new-tag"
 
 # Rebuild indices
-obsidian-agent sync
+clausidian sync
 
 # Rename a note (updates all references)
-obsidian-agent rename "build-api" "API Gateway"
+clausidian rename "build-api" "API Gateway"
 
 # Move note to a different type
-obsidian-agent move "my-idea" project
+clausidian move "my-idea" project
 
 # Merge two notes
-obsidian-agent merge "draft-api" "build-api"
+clausidian merge "draft-api" "build-api"
 
 # Find duplicate notes
-obsidian-agent duplicates --threshold 0.4
+clausidian duplicates --threshold 0.4
 
 # Find broken links
-obsidian-agent broken-links
+clausidian broken-links
 
 # Batch operations
-obsidian-agent batch tag --type idea --add "needs-review"
-obsidian-agent batch archive --tag "deprecated"
-obsidian-agent batch update --type project --set-status active
+clausidian batch tag --type idea --add "needs-review"
+clausidian batch archive --tag "deprecated"
+clausidian batch update --type project --set-status active
 
 # Export / Import
-obsidian-agent export vault-backup.json
-obsidian-agent export --format markdown --type project
-obsidian-agent import notes.json
+clausidian export vault-backup.json
+clausidian export --format markdown --type project
+clausidian import notes.json
 
 # Regex search
-obsidian-agent search "API.*v[23]" --regex
+clausidian search "API.*v[23]" --regex
 
 # Smart linking
-obsidian-agent link --dry-run          # preview missing links
-obsidian-agent link                    # create bidirectional links
+clausidian link --dry-run          # preview missing links
+clausidian link                    # create bidirectional links
 
 # Activity timeline
-obsidian-agent timeline --days 7
-obsidian-agent timeline --type project
+clausidian timeline --days 7
+clausidian timeline --type project
 
 # Vault quality
-obsidian-agent validate
-obsidian-agent relink --dry-run        # preview broken link fixes
-obsidian-agent relink                  # auto-fix broken links
+clausidian validate
+clausidian relink --dry-run        # preview broken link fixes
+clausidian relink                  # auto-fix broken links
 
 # Pin favorites
-obsidian-agent pin "important-note"
-obsidian-agent pin list
-obsidian-agent unpin "important-note"
+clausidian pin "important-note"
+clausidian pin list
+clausidian unpin "important-note"
 
 # Daily dashboard
-obsidian-agent daily
+clausidian daily
 
 # Improvement suggestions
-obsidian-agent suggest
+clausidian suggest
 
 # Word count stats
-obsidian-agent count
-obsidian-agent count --type project
+clausidian count
+clausidian count --type project
 
 # Pending tasks
-obsidian-agent agenda
-obsidian-agent agenda --all
+clausidian agenda
+clausidian agenda --all
 
 # Vault changelog
-obsidian-agent changelog --days 14
+clausidian changelog --days 14
 
 # Graph exploration
-obsidian-agent neighbors "my-project" --depth 3
+clausidian neighbors "my-project" --depth 3
 
 # Serendipity
-obsidian-agent random 3
-obsidian-agent random --type idea
+clausidian random 3
+clausidian random --type idea
 
 # What to work on
-obsidian-agent focus
+clausidian focus
 ```
 
 ## Vault Structure
 
-After `obsidian-agent init`, your vault looks like:
+After `clausidian init`, your vault looks like:
 
 ```
 my-vault/
@@ -186,9 +186,9 @@ The agent uses CLI commands to manage notes:
 
 ```bash
 # The agent runs these commands in your terminal
-obsidian-agent note "Learn Rust" project --tags "coding,learning"
-obsidian-agent capture "Idea for a new feature"
-obsidian-agent sync
+clausidian note "Learn Rust" project --tags "coding,learning"
+clausidian capture "Idea for a new feature"
+clausidian sync
 ```
 
 Each command:
@@ -269,17 +269,6 @@ related: ["[[other-note]]", "[[another-note]]"]
 | `watch` | Auto-rebuild indices on file changes |
 | `serve` | Start MCP server (stdio transport) |
 | `hook <event>` | Handle agent hook events |
-| `bridge-status` | Show Obsidian CLI bridge status |
-| `smart-search <query>` | BM25 ranked search (better relevance than keyword) |
-| `canvas create <name>` | Create a JSON Canvas (.canvas) file |
-| `canvas read <name>` | Read and display canvas structure |
-| `canvas add-node <name>` | Add a node (text/file/link/group) to a canvas |
-| `canvas add-edge <name>` | Add an edge between canvas nodes |
-| `embed-search <query>` | Semantic search via Ollama/OpenAI embeddings (optional) |
-| `embed-status` | Show embedding provider status |
-| `base create <name>` | Create an Obsidian Base (.base) file |
-| `base read <name>` | Read and parse a .base file |
-| `base query <name>` | Query vault notes using base filters |
 
 ### Flags
 
@@ -306,7 +295,6 @@ related: ["[[other-note]]", "[[another-note]]"]
 | `--dry-run` | Preview changes without applying (for link, relink) |
 | `--days <N>` | Days to look back for timeline (default: 30) |
 | `--limit <N>` | Max entries for timeline (default: 50) |
-| `--no-bridge` | Skip Obsidian CLI bridge for this command |
 
 ## Fuzzy Note Lookup
 
@@ -314,16 +302,16 @@ Commands that take a note name support fuzzy matching — no need to type the ex
 
 ```bash
 # Exact
-obsidian-agent read build-api
+clausidian read build-api
 
 # Case-insensitive
-obsidian-agent read Build-API
+clausidian read Build-API
 
 # Partial match
-obsidian-agent read vector          # finds "vector-search"
+clausidian read vector          # finds "vector-search"
 
 # Title match
-obsidian-agent read "Build API"     # finds "build-api"
+clausidian read "Build API"     # finds "build-api"
 ```
 
 Works with: `read`, `delete`, `update`, `archive`, `patch`, `backlinks`, `rename`, `move`, `merge`, `pin`, `unpin`.
@@ -341,92 +329,8 @@ Search results are ranked by relevance score:
 | Body text | 1 |
 
 ```bash
-obsidian-agent search "API"         # title matches appear first
-obsidian-agent search "API.*v2" --regex   # regex pattern matching
-```
-
-## BM25 Smart Search (v1.3+)
-
-`smart-search` uses the BM25 algorithm (same as Elasticsearch/Lucene) for significantly better search results than keyword matching:
-
-```bash
-obsidian-agent smart-search "API design patterns"   # multi-word queries work naturally
-obsidian-agent smart-search "REST endpoints" --type project  # with filters
-```
-
-**How it works:**
-- Builds an inverted index across all notes
-- Field weighting: title (3×), tags (2×), summary (2×), body (1×)
-- English stemming: "designing" matches "design", "designed", "designs"
-- Stop word removal (English + Chinese)
-- Document length normalization — short and long notes compete fairly
-
-Use `search` for exact keyword/regex matching, `smart-search` for natural language queries.
-
-## JSON Canvas (v1.3+)
-
-Read and write [JSON Canvas](https://jsoncanvas.org) (`.canvas`) files — Obsidian's visual whiteboard format:
-
-```bash
-obsidian-agent canvas create my-board          # create empty canvas
-obsidian-agent canvas add-node my-board --type text --text "Hello"
-obsidian-agent canvas add-node my-board --type file --file "projects/api.md"
-obsidian-agent canvas add-node my-board --type link --url "https://example.com"
-obsidian-agent canvas add-edge my-board --from node1 --to node2 --label "depends on"
-obsidian-agent canvas read my-board            # display structure
-```
-
-Supports all node types (text, file, link, group) and edges with labels and colors.
-
-## Obsidian Bases (v1.5+)
-
-Read, write, and query [Obsidian Bases](https://help.obsidian.md/bases) (`.base` files) — structured data views over vault notes:
-
-```bash
-obsidian-agent base create project-tracker    # create .base file
-obsidian-agent base read project-tracker      # display structure
-obsidian-agent base query project-tracker     # query matching notes
-obsidian-agent base query project-tracker --view "Active"  # specific view
-```
-
-Bases use YAML with filters, views, and formulas. obsidian-agent can execute filter expressions headlessly:
-
-```yaml
-# project-tracker.base
-filters:
-  and:
-    - file.hasTag("project")
-    - status != "archived"
-views:
-  - type: table
-    name: Active Projects
-```
-
-Supported filter expressions: `file.hasTag()`, `file.inFolder()`, `== / !=` comparisons.
-
-## Embedding Search (v1.4+, Optional)
-
-For true semantic search, `embed-search` uses external embedding providers — zero npm dependencies, just native `fetch`:
-
-```bash
-obsidian-agent embed-search "how to design good APIs"  # auto-detects provider
-obsidian-agent embed-status                             # check what's available
-```
-
-**Provider detection order:**
-1. **Ollama** (local, offline) — detects `localhost:11434`, uses `nomic-embed-text`
-2. **OpenAI** — reads `OA_OPENAI_KEY` or `OPENAI_API_KEY` env var
-3. **BM25 fallback** — if no provider available, falls back to `smart-search`
-
-Embeddings are cached in `.obsidian-agent/embeddings.json` with incremental updates — only changed notes are re-embedded.
-
-```bash
-# Use specific provider
-obsidian-agent embed-search "query" --provider ollama
-obsidian-agent embed-search "query" --provider openai
-
-# Disable embedding, force BM25
-obsidian-agent embed-search "query" --provider off
+clausidian search "API"         # title matches appear first
+clausidian search "API.*v2" --regex   # regex pattern matching
 ```
 
 ## JSON Output
@@ -434,9 +338,9 @@ obsidian-agent embed-search "query" --provider off
 All commands support `--json` for machine-readable output:
 
 ```bash
-obsidian-agent search "API" --json
-obsidian-agent stats --json
-obsidian-agent list project --status active --json
+clausidian search "API" --json
+clausidian stats --json
+clausidian list project --status active --json
 ```
 
 ## Heading-Level Edits
@@ -445,19 +349,19 @@ Edit specific sections of a note without rewriting the whole file:
 
 ```bash
 # Append to a section
-obsidian-agent patch "my-project" --heading "TODO" --append "- [ ] New task"
+clausidian patch "my-project" --heading "TODO" --append "- [ ] New task"
 
 # Replace section content
-obsidian-agent patch "my-project" --heading "Notes" --replace "Updated notes here"
+clausidian patch "my-project" --heading "Notes" --replace "Updated notes here"
 
 # Read a section
-obsidian-agent patch "my-project" --heading "TODO"
+clausidian patch "my-project" --heading "TODO"
 ```
 
 ## Claude Code Setup (One Command)
 
 ```bash
-obsidian-agent setup ~/my-vault
+clausidian setup ~/my-vault
 ```
 
 This automatically:
@@ -472,20 +376,20 @@ Run as an [MCP](https://modelcontextprotocol.io/) server for AI assistants (Clau
 ```json
 {
   "mcpServers": {
-    "obsidian-agent": {
-      "command": "obsidian-agent",
+    "clausidian": {
+      "command": "clausidian",
       "args": ["serve", "--vault", "/path/to/vault"]
     }
   }
 }
 ```
 
-Exposes 55+ tools including: journal, note, capture, search, smart_search, embed_search, list, read, recent, delete, backlinks, update, archive, patch, stats, orphans, graph, health, sync, tag_list, tag_rename, rename, move, merge, duplicates, broken_links, batch_update, batch_tag, batch_archive, export, neighbors, random, focus, canvas (create/read/add-node/add-edge), base (create/read/query), embed_status, bridge_status, and more.
+Exposes 44 tools: journal, note, capture, search, list, read, recent, delete, backlinks, update, archive, patch, stats, orphans, graph, health, sync, tag_list, tag_rename, rename, move, merge, duplicates, broken_links, batch_update, batch_tag, batch_archive, export, neighbors, random, focus, and more.
 
 ## Vault Health
 
 ```bash
-obsidian-agent health
+clausidian health
 ```
 
 Scores your vault across 4 dimensions (0-100 each):
@@ -511,7 +415,7 @@ Add to your Claude Code settings (`~/.claude/settings.json`):
         "hooks": [
           {
             "type": "command",
-            "command": "obsidian-agent hook session-stop --vault ~/my-vault"
+            "command": "clausidian hook session-stop --vault ~/my-vault"
           }
         ]
       }
@@ -524,13 +428,13 @@ Add to your Claude Code settings (`~/.claude/settings.json`):
 
 ```bash
 # Daily backfill — creates journal from git history
-obsidian-agent hook daily-backfill --vault ~/my-vault --scan-root ~/projects
+clausidian hook daily-backfill --vault ~/my-vault --scan-root ~/projects
 
 # Weekly review
-obsidian-agent review --vault ~/my-vault
+clausidian review --vault ~/my-vault
 
 # Monthly review
-obsidian-agent review monthly --vault ~/my-vault
+clausidian review monthly --vault ~/my-vault
 ```
 
 ## Knowledge Precipitation (v0.9+)
@@ -540,26 +444,12 @@ Five automated rules that help knowledge settle from journals into permanent not
 | Rule | Command | What it does |
 |------|---------|-------------|
 | A1: Promotion Suggestions | `review` | Scans weekly journals for topics appearing 2+ days → suggests promotion to projects/resources |
-| A2: Idea Temperature | `health` | Tracks idea freshness: 🆕 new, 🔥 active, 🧊 frozen (14d), 💀 archive (30d) |
+| A2: Idea Temperature | `health` | Tracks idea freshness: new, active, frozen (14d), archive (30d) |
 | A3: Staleness Detection | `review monthly` | Flags resources >60d stale, active projects >30d dormant, dead ideas |
 | A4: Conclusion Extraction | `hook session-stop` | Auto-tags journals with #conclusion or #resolved based on content |
 | A5: Link Suggestions | `sync` | Finds note pairs sharing 2+ tags but missing related links |
 
 These rules run automatically as part of existing commands — no extra setup needed. Over time, they ensure your vault stays organized: ideas get promoted or archived, stale notes get flagged, and connections between notes are surfaced.
-
-## Obsidian CLI Bridge (v1.2+)
-
-When [Obsidian 1.12+ CLI](https://help.obsidian.md/cli) is installed, obsidian-agent automatically bridges supported commands (search, read, backlinks, orphans, tags, random) to the official CLI for richer results that leverage Obsidian's indexing.
-
-Commands unique to obsidian-agent (health, graph, review, PARA init, link, suggest, focus, batch ops, etc.) always run natively — these have no official CLI equivalent.
-
-```bash
-obsidian-agent bridge-status         # Check if official CLI is detected
-obsidian-agent search foo --no-bridge # Force native search
-OA_NO_OFFICIAL_CLI=1 obsidian-agent search foo  # Disable bridge globally
-```
-
-The bridge is transparent: if the official CLI fails or is unavailable, obsidian-agent falls back to its native implementation automatically.
 
 ## Environment Variables
 
@@ -567,11 +457,10 @@ The bridge is transparent: if the official CLI fails or is unavailable, obsidian
 |----------|-------------|---------|
 | `OA_VAULT` | Default vault path | cwd |
 | `OA_TIMEZONE` | Timezone for dates | UTC |
-| `OA_NO_OFFICIAL_CLI` | Set to `1` to disable Obsidian CLI bridge | (auto-detect) |
 
 ## Agent Compatibility
 
-`obsidian-agent init` generates config files for multiple agents:
+`clausidian init` generates config files for multiple agents:
 
 | Agent | Config Location |
 |-------|----------------|
@@ -580,7 +469,7 @@ The bridge is transparent: if the official CLI fails or is unavailable, obsidian
 | GitHub Copilot | `.github/copilot/instructions.md` |
 | Any agent | `AGENT.md` (universal instructions) |
 
-All agents read `AGENT.md` which tells them to use the `obsidian-agent` CLI. No agent-specific code needed.
+All agents read `AGENT.md` which tells them to use the `clausidian` CLI. No agent-specific code needed.
 
 ## Customization
 
@@ -592,6 +481,17 @@ Edit `CONVENTIONS.md` to change frontmatter rules, naming conventions, or agent 
 
 ### Language
 Templates ship in English. Replace template content with your preferred language — the CLI doesn't care about content language, only the `{{}}` placeholders.
+
+## Migration from obsidian-agent
+
+If you're upgrading from `obsidian-agent`:
+
+```bash
+npm uninstall -g obsidian-agent
+npm install -g clausidian
+```
+
+The CLI commands and vault structure are fully compatible — only the binary name changed.
 
 ## Development
 

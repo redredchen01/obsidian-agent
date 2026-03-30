@@ -9,10 +9,12 @@ export function sync(vaultRoot) {
   const idx = new IndexManager(vault);
   const result = idx.sync();
 
-  console.log(
-    `Index synced: ${result.tags} tags, ${result.notes} notes, ` +
-      `${result.relationships} relationships, ${result.suggestedLinks} suggestions`
-  );
+  const parts = [
+    `${result.tags} tags`, `${result.notes} notes`,
+    `${result.relationships} relationships`, `${result.suggestedLinks} suggestions`,
+  ];
+  if (result.clusters !== undefined) parts.push(`${result.clusters} cluster(s)`);
+  console.log(`Index synced: ${parts.join(', ')}`);
 
   return result;
 }
