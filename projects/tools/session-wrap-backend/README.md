@@ -430,7 +430,7 @@ Frontend is served as static files from Express after `web/npm run build`.
 
 ### Testing
 ```bash
-cd web
+cd ~/YD\ 2026/projects/tools/session-wrap-backend/web
 npm test                    # Unit tests (Vitest)
 npm run test:e2e           # E2E tests (Playwright)
 npm run test:coverage      # Coverage report

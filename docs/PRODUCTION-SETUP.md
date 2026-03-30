@@ -4,7 +4,7 @@
 
 ## Current Location
 
-不要再使用舊的根目錄路徑：
+不要再把下面這種寫法當成當前工作區入口：
 
 ```bash
 cd session-wrap-backend
