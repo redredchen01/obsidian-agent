@@ -1,0 +1,51 @@
+#!/bin/bash
+# Pre-commit hook — 自动检查 shell 脚本质量
+# 安装：cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -e
+
+SCRIPTS=(
+    "install.sh"
+    "setup.sh"
+    "health.sh"
+    "verify.sh"
+    "lib/common.sh"
+)
+
+echo "🔍 检查 Shell 脚本..."
+echo ""
+
+# 检查语法
+echo "1️⃣  Bash 语法检查..."
+for script in "${SCRIPTS[@]}"; do
+    if [[ -f "$script" ]]; then
+        if bash -n "$script" 2>&1; then
+            echo "   ✓ $script"
+        else
+            echo "   ✗ $script — 语法错误"
+            exit 1
+        fi
+    fi
+done
+echo ""
+
+# 检查 shellcheck（如果已安装）
+if command -v shellcheck &> /dev/null; then
+    echo "2️⃣  ShellCheck 静态分析..."
+    for script in "${SCRIPTS[@]}"; do
+        if [[ -f "$script" ]]; then
+            if shellcheck "$script" 2>&1; then
+                echo "   ✓ $script"
+            else
+                echo "   ⚠️  $script — 警告（未阻止提交）"
+            fi
+        fi
+    done
+    echo ""
+else
+    echo "⚠️  ShellCheck 未安装，跳过静态分析"
+    echo "   安装：brew install shellcheck（macOS）或 apt install shellcheck（Linux）"
+    echo ""
+fi
+
+echo "✅ 所有检查通过！"

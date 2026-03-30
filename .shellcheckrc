@@ -1,0 +1,10 @@
+# ShellCheck 配置文件
+# 用法：安装 shellcheck 后，在项目目录运行：
+#   shellcheck *.sh lib/*.sh
+
+# 禁用的规则（可选）
+# disable=SC2086  # Quotes around var with spaces
+
+# 启用的标准
+external-sources=true
+source-path=lib
