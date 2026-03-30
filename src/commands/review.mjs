@@ -370,6 +370,47 @@ ${activeProjectsTable}
     );
   }
 
+  // A3: KB staleness section in monthly review
+  const now = new Date();
+  const sixtyDaysAgo = new Date(now - 60 * 86400000).toISOString().slice(0, 10);
+  const thirtyDaysAgo = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
+
+  const staleResources = allNotes.filter(n =>
+    n.type === 'resource' && n.updated && n.updated < sixtyDaysAgo
+  );
+  const staleProjectsList = allNotes.filter(n =>
+    n.type === 'project' && n.status === 'active' && n.updated && n.updated < thirtyDaysAgo
+  );
+  const deadIdeas = allNotes.filter(n =>
+    n.type === 'idea' && n.updated && n.updated < thirtyDaysAgo
+  );
+
+  if (staleResources.length || staleProjectsList.length || deadIdeas.length) {
+    let stalenessSection = '\n## KB 健康報告（自動生成）\n\n';
+    if (staleResources.length) {
+      stalenessSection += '### 過期資源 (60+ 天未更新)\n';
+      for (const r of staleResources) {
+        stalenessSection += `- ⏰ [[${r.file}]] — last updated ${r.updated}\n`;
+      }
+      stalenessSection += '\n';
+    }
+    if (staleProjectsList.length) {
+      stalenessSection += '### 不活躍項目 (active 但 30+ 天未更新)\n';
+      for (const p of staleProjectsList) {
+        stalenessSection += `- 📦 [[${p.file}]] → 建議歸檔\n`;
+      }
+      stalenessSection += '\n';
+    }
+    if (deadIdeas.length) {
+      stalenessSection += '### 沉寂想法 (30+ 天未提及)\n';
+      for (const i of deadIdeas) {
+        stalenessSection += `- 💀 [[${i.file}]] → 建議歸檔\n`;
+      }
+      stalenessSection += '\n';
+    }
+    content += stalenessSection;
+  }
+
   const reviewFile = `${y}-${monthStr}-review`;
   vault.write('journal', `${reviewFile}.md`, content);
   idx.updateDirIndex('journal', reviewFile, `${y} ${monthStr} Review`);

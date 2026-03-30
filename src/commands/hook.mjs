@@ -36,26 +36,33 @@ function getGitCommits(scanRoot, date) {
   return commits;
 }
 
-// ── A4: Tag conclusions and resolved issues in journal ──
+// ── A4: Extract conclusions and resolved items, update frontmatter tags ──
 
 function tagConclusions(content) {
-  const ideasMatch = content.match(/## (想法|Ideas)\n([\s\S]*?)(?=\n## |---|\n$)/);
-  const issuesMatch = content.match(/## (問題與風險|问题与风险|Issues)\n([\s\S]*?)(?=\n## |---|\n$)/);
+  const ideasMatch = content.match(/## (?:想法|Ideas)\n([\s\S]*?)(?=\n## |\n---|$)/);
+  const issuesMatch = content.match(/## (?:問題與風險|问题与风险|Issues)\n([\s\S]*?)(?=\n## |\n---|$)/);
 
-  const hasConclusion = ideasMatch && ideasMatch[2].split('\n')
-    .filter(l => l.startsWith('- '))
-    .some(l => !l.includes('？') && !l.includes('?') && !l.includes('待驗證') && !l.includes('待确认') && l.length > 10);
+  // Check if "想法" has conclusive statements (not questions, not "待驗證")
+  const hasConclusion = ideasMatch && ideasMatch[1].split('\n')
+    .filter(l => l.trim().startsWith('- ') && l.trim() !== '-')
+    .some(l => {
+      const text = l.replace(/^-\s*/, '').trim();
+      return text.length > 5
+        && !text.includes('？') && !text.includes('?')
+        && !text.includes('待驗證') && !text.includes('待验证')
+        && !text.includes('待確認') && !text.includes('待确认')
+        && !text.includes('TBD');
+    });
 
-  const hasResolved = issuesMatch && issuesMatch[2].split('\n')
-    .filter(l => l.startsWith('- '))
-    .some(l => l.includes('✅') || l.includes('已解決') || l.includes('已修復') || l.includes('resolved'));
+  // Check if "問題與風險" has resolved items
+  const hasResolved = issuesMatch && /✅|已解決|已解决|已修復|已修复|resolved|fixed/i.test(issuesMatch[1]);
 
-  const tagsMatch = content.match(/tags:\s*\[(.+)\]/);
+  const tagsMatch = content.match(/tags:\s*\[([^\]]*)\]/);
   if (tagsMatch) {
-    const tags = tagsMatch[1].split(',').map(t => t.trim());
+    const tags = tagsMatch[1].split(',').map(t => t.trim()).filter(Boolean);
     if (hasConclusion && !tags.includes('conclusion')) tags.push('conclusion');
     if (hasResolved && !tags.includes('resolved')) tags.push('resolved');
-    content = content.replace(/tags:\s*\[.+\]/, `tags: [${tags.join(', ')}]`);
+    content = content.replace(/tags:\s*\[[^\]]*\]/, `tags: [${tags.join(', ')}]`);
   }
   return content;
 }
