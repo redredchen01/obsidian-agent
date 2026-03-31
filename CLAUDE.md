@@ -1,49 +1,64 @@
-# YD 2026 Workspace
+# Clausidian Development
 
-三個活躍主項目 + Obsidian 知識庫 + Claude Memory。
+Claude Code's Obsidian integration toolkit — AI agent toolkit for vault management with zero dependencies.
 
-## 核心設定
-- 語言：繁體中文
-- 風格：直接、技術導向、少廢話
+## Core Settings
+- **Language**: English (for open-source contributions)
+- **Style**: Direct, technical, minimal ceremony
+- **Node.js**: >= 18 (ESM modules)
 
-## 快速啟動
+## Quick Start
+
 ```bash
-source ~/.zshrc-workspace
+# Install
+npm install -g clausidian
 
-p1                      # GWX
-p2                      # TG Bot
-p3                      # NS_0327
-pw                      # 工作區根
-kb                      # obsidian/
-yd-status               # 主項目狀態
-yd-info                 # 項目索引
+# Or run locally
+npm test           # Run full test suite
+npm run dev        # Development mode (if available)
+
+# Init a new vault
+clausidian init ~/my-vault
+clausidian setup ~/my-vault
 ```
 
-## Projects
-| P | 項目 | 位置 | 常用命令 |
-|---|------|------|----------|
-| **1** | GWX | `projects/production/gwx/` | `gwx-install`, `gwx-test` |
-| **2** | TG Bot | `projects/production/claude_code_telegram_bot/` | `tg-start`, `tg-smoke` |
-| **3** | NS_0327 | `projects/experimental/NS_0327/` | `ns-install`, `ns-test` |
+## Development Workflow
 
-詳細索引：見 `PROJECTS_INFO.md`
-
-## 目錄結構
-```text
-YD 2026/
-├── projects/
-│   ├── production/
-│   │   ├── gwx/
-│   │   └── claude_code_telegram_bot/
-│   ├── experimental/
-│   │   └── NS_0327/
-│   └── tools/
-├── docs/
-├── scripts/
-├── obsidian/
-├── PROJECTS_INFO.md
-└── .zshrc-workspace
+### Testing
+```bash
+npm test                    # All tests
+npm test -- test/foo.mjs    # Single test file
 ```
 
-## 注意
-- session-wrap 產品文檔已歸檔至 `docs/archive/session-wrap/`。
+### Code Organization
+- **src/commands/** — CLI command implementations
+- **src/registry.mjs** — Command registry (CLI + MCP source of truth)
+- **src/mcp-server.mjs** — MCP server (Model Context Protocol)
+- **test/** — Test suite (node:test framework)
+- **scaffold/** — Vault init templates and AGENT.md
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `src/registry.mjs` | Single source of truth for all 55+ commands (CLI + MCP) |
+| `src/mcp-server.mjs` | MCP server implementation (stdio transport) |
+| `src/commands/*.mjs` | Individual command implementations |
+| `test/*.test.mjs` | Comprehensive test suite |
+
+## Architecture
+
+- **Zero dependencies** — only Node.js standard library
+- **MCP Protocol** — exposes 44+ tools via Model Context Protocol
+- **CLI-first** — all functionality available from command line
+- **Hook system** — integrates with agent workflows (session-start, pre-tool-use, session-stop, etc.)
+
+## Contributing
+
+Before submitting PRs:
+1. Run full test suite: `npm test`
+2. Ensure all tests pass (target: 100%)
+3. Follow existing code patterns (no external dependencies)
+4. Update tests for new functionality
+5. Document new commands in README.md
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design notes.
