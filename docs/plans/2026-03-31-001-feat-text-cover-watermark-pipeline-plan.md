@@ -34,7 +34,8 @@ date: 2026-03-31
 ## Scope Boundaries
 
 - **不包含** SAM2 精確多邊形 mask（保留為 future enhancement）
-- **不包含** 原始 inpainting pipeline 的任何改動（tracking / temporal_ref / spatial_restore / integration）
+- **不包含** `src/tasks/video.py:process_video` Celery task 的 signature 更新（task 目前是 stub；text-cover 僅透過 `api/worker/processor.py` worker path 支援，後續 Celery 整合需另行同步新參數）
+- **不包含** 原始 `watermark` mode pipeline 的任何改動（tracking / temporal_ref / spatial_restore / integration）
 - **不包含** 訓練或微調 OCR 模型
 - **不包含** 即時（realtime）處理優化
 - delogo ffmpeg 整合**僅作為靜態位置選項**，浮動水印使用 Python 路徑
@@ -243,13 +244,13 @@ graph TB
 **Approach:**
 新增以下 optional fields（均有預設值，不破壞現有程式碼）：
 ```
-pipeline_mode: str = "watermark"          # "watermark" | "text-cover"
-text_detect_backend: str = "easyocr"      # "paddleocr" | "easyocr"
-cover_strategy: str = "gaussian_blur"     # "gaussian_blur" | "solid" | "lama"
-detect_interval: int = 10                 # 偵測採樣間隔（幀數）
-bbox_padding: int = 6                     # bbox 擴展像素
-confidence_threshold: float = 0.5        # OCR 信心度閾值
-blur_ksize: int = 51                      # gaussian blur 核大小
+pipeline_mode: str = "watermark"             # "watermark" | "text-cover"
+text_detect_backend: str = "easyocr"         # "paddleocr" | "easyocr"
+cover_strategy: str = "gaussian_blur"        # "gaussian_blur" | "solid" | "lama"
+detect_interval: int = 10                    # 偵測採樣間隔（幀數）
+bbox_padding: int = 6                        # bbox 擴展像素
+ocr_confidence_threshold: float = 0.5       # OCR 信心度閾值（避免與 Tracker.confidence_threshold 衝突）
+blur_ksize: int = 51                         # gaussian blur 核大小
 ```
 
 **Test scenarios:**
@@ -276,8 +277,11 @@ blur_ksize: int = 51                      # gaussian blur 核大小
 **Approach:**
 - `_load_or_generate_masks()` 加 branch：`if self.config.pipeline_mode == "text-cover": masks = self._detect_text_regions(frames)`
 - 新私有方法 `_detect_text_regions(frames) -> List[np.ndarray]`：初始化 `TextDetector`，呼叫 `TextDetectionSampler`，將 bbox list 轉為 mask ndarray
-- `_spatial_restoration()` 加 condition：`cover_strategy == "lama"` 時用 `LamaRestorer`，否則用 `TextCoverRestorer`
-- 其餘 4 個 phase（tracking / temporal_ref / integration / output）**不改動**
+- `VideoPipeline.run()` 加 mode guard：`text-cover` 且 `cover_strategy in ("gaussian_blur", "solid")` 時，**跳過** `_track_and_stabilize()` + `_fetch_temporal_references()`，直接呼叫新私有方法 `_apply_cover(frames, masks)`
+- `_apply_cover()` 為 text-cover 專屬 phase：gaussian_blur / solid 呼叫 `TextCoverRestorer`；lama 呼叫 `LamaRestorer.restore_single()` loop
+- `lama` strategy 路徑仍執行 `_fetch_temporal_references()`（`LamaRestorer` 不需要 references，但保留以避免 `run()` 控制流複雜化——此為 deferred 優化）
+- `integration.py` 的 `BoundaryBlender` 對所有路徑仍執行（保留輸出穩定性）
+- 現有 `watermark` mode 路徑：**不改動任何邏輯**
 
 **Patterns to follow:**
 - `src/pipeline.py:_load_or_generate_masks()` — 現有 ROI/mask_video if/elif 結構
@@ -374,11 +378,14 @@ blur_ksize: int = 51                      # gaussian blur 核大小
 
 | Risk | Mitigation |
 |------|------------|
-| PaddleOCR + PyTorch CUDA 版本衝突 | 預設後端為 EasyOCR（無 PaddlePaddle 依賴）；文件明確說明 PaddleOCR 需獨立 conda env 或 RapidOCR (ONNX) |
-| 半透明水印 OCR 漏偵測 | 暴露 `confidence_threshold` 給使用者調整；文件說明 CLAHE 前處理技巧（作為進階 FAQ） |
+| PaddleOCR + PyTorch CUDA 版本衝突 | 預設後端為 EasyOCR（無 PaddlePaddle 依賴）；文件說明 PaddleOCR 需獨立 conda env 或 RapidOCR (ONNX) |
+| 半透明水印 OCR 漏偵測 | 暴露 `ocr_confidence_threshold` 給使用者調整；文件說明 CLAHE 前處理技巧（進階 FAQ） |
 | `detect_interval` 插值誤差（水印快速漂移） | 預設 N=10 保守；使用者可設 `--detect-interval 1` 強制逐幀偵測 |
-| EasyOCR 在無 GPU 機器上速度過慢 | 明確在 README 標注 EasyOCR CPU 適用影片 < 5min；建議 GPU 用 PaddleOCR |
+| EasyOCR 在無 GPU 機器速度過慢 | README 標注 EasyOCR CPU 適用 < 5min 影片；GPU 建議 PaddleOCR |
 | 新 `optional [text-cover]` extra 破壞現有 install | 新依賴放入 `pyproject.toml` optional extras，不加入 base requirements |
+| Celery task 靜默忽略新參數（未來風險） | Scope 已明確排除；Celery task 整合時需同步更新 `process_video` signature |
+| 兩個並發 text-cover job 的 peak memory | Worker `max_concurrent=2` 情境下，兩個 OCR 模型實例 + 完整 frames list 共存；README 標注建議單並發用於長影片 |
+| `detect_interval=0` 除零（dataclass 無 validation） | `TextDetectionSampler.__init__` 加 `assert detect_interval >= 1` guard |
 
 ## Documentation / Operational Notes
 

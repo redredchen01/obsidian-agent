@@ -12,23 +12,25 @@
 
 ## Pending
 
-- [ ] 2026-03-31 | P1 | /auto-daily | 自動從 git+Obsidian+gwx+GA4 生成 daily-context.json | auto-daily-context
-- [ ] 2026-03-31 | P2 | /ops-recommender | AI 推薦引擎：基於歷史告警模式推薦行動 | ops-system-upgrade-roadmap
-- [ ] 2026-03-31 | P2 | /alert-dedupe | 告警去重和自動升級邏輯 | ops-system-upgrade-roadmap
-- [ ] 2026-03-31 | P2 | /xhs-healthcheck | xhs 集成故障根因分析 (392 連續失敗) | dex-bot
+<!-- Queue is now empty -->
 
 ## Built
 
-- [x] 2026-03-31 | P1 | /dspy-trial | DSPy 自動 prompt 優化 — Obsidian tag 匹配精度 | dspy-trial-plan | built: 2026-03-31
-- [x] 2026-03-31 | P1 | /dashboard-roi-logger | 記錄 dashboard 使用頻率，驗證 Phase 9C/D ROI | dashboard-value-validation | built: 2026-03-31
+- [x] 2026-03-31 | P1 | /auto-daily | 自動從 git+Obsidian+gwx+GA4 生成 daily-context.json | built: 2026-03-31
+- [x] 2026-03-31 | P1 | /dspy-trial | DSPy 自動 prompt 優化 — Obsidian tag 匹配精度 | built: 2026-03-31
+- [x] 2026-03-31 | P1 | /dashboard-roi-logger | 記錄 dashboard 使用頻率，驗證 Phase 9C/D ROI | built: 2026-03-31
 
-- [x] 2026-03-31 | P1 | /site-doctor-skill | 一鍵全套站點診斷，整合 Lighthouse + SEO + 斷鏈 + CrUX + SSL | site-doctor-skill | built: 2026-03-31
-- [x] 2026-03-31 | P1 | /competitor-intel-skill | 競品情報自動簡報，定期監控、趨勢識別、週報推送 | competitor-intel-skill | built: 2026-03-31
-- [x] 2026-03-31 | P1 | /api-aggregation-notifier | 通用框架：多源 API 數據聚合 → 轉換表格 → Slack dispatch | api-aggregation-framework | built: 2026-03-31
-- [x] 2026-03-30 | P1 | /pypi-publish | 消除手動 twine upload，一鍵打包+上傳 PyPI | pypi-auto-publish | built: 2026-03-30
-- [x] 2026-03-30 | P1 | /agent-trace | append-only JSONL agent 操作追蹤，查詢+周報整合 | agent-trace-system | built: 2026-03-30
-- [x] 2026-03-30 | P1 | /site-doctor | 複合站點診斷：可用性+SEO+效能+競品對標 | site-doctor-skill | built: 2026-03-30
+- [x] 2026-03-31 | P2 | /ops-recommender | AI 推薦引擎：基於歷史告警模式推薦行動 | built: 2026-03-31
+- [x] 2026-03-31 | P2 | /alert-dedupe | 告警去重和自動升級邏輯 | built: 2026-03-31
+- [x] 2026-03-31 | P2 | /xhs-healthcheck | xhs 集成故障根因分析 (392 連續失敗) | built: 2026-03-31
+
+- [x] 2026-03-31 | P1 | /site-doctor-skill | 一鍵全套站點診斷，整合 Lighthouse + SEO + 斷鏈 + CrUX + SSL | built: 2026-03-31
+- [x] 2026-03-31 | P1 | /competitor-intel-skill | 競品情報自動簡報，定期監控、趨勢識別、週報推送 | built: 2026-03-31
+- [x] 2026-03-31 | P1 | /api-aggregation-notifier | 通用框架：多源 API 數據聚合 → 轉換表格 → Slack dispatch | built: 2026-03-31
+- [x] 2026-03-30 | P1 | /pypi-publish | 消除手動 twine upload，一鍵打包+上傳 PyPI | built: 2026-03-30
+- [x] 2026-03-30 | P1 | /agent-trace | append-only JSONL agent 操作追蹤，查詢+周報整合 | built: 2026-03-30
+- [x] 2026-03-30 | P1 | /site-doctor | 複合站點診斷：可用性+SEO+效能+競品對標 | built: 2026-03-30
 - [x] 2026-03-30 | P2 | /prompt-audit | 掃描所有 skill/prompt 找反模式，A/B 框架建議 | built: 2026-03-30
 - [x] 2026-03-30 | P2 | /launchd-health | 列出 24 個 LaunchAgent 狀態+失敗告警 | built: 2026-03-30
-- [x] 2026-03-31 | P1 | /linear-slack-reporter | 自動查詢 Linear bug、整理成表格、發 Slack 通知 | linear-slack-bug-reporter | built: 2026-03-31
+- [x] 2026-03-31 | P1 | /linear-slack-reporter | 自動查詢 Linear bug、整理成表格、發 Slack 通知 | built: 2026-03-31
 

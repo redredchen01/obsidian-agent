@@ -1,22 +1,44 @@
 /**
  * Vault — core operations for reading/writing Obsidian notes
+ *
+ * Initiative B Integration:
+ * - B2.1: VaultIndexer for incremental indexing
+ * - B2.2: VaultQueryCache for smart caching with TTL
+ * - B2.3: ParallelQueryExecutor for multi-pattern search
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, openSync, readSync, closeSync } from 'fs';
 import { resolve, join, dirname } from 'path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'crypto';
 import { SimilarityEngine } from './similarity-engine.mjs';
 import { updateFrontmatter } from './frontmatter-helper.mjs';
+import { VaultIndexer } from './vault-indexer.mjs';
+import { VaultQueryCache } from './vault-query-cache.mjs';
+import { ParallelQueryExecutor } from './parallel-query-executor.mjs';
 
 const DEFAULT_DIRS = ['areas', 'projects', 'resources', 'journal', 'ideas'];
 
 export class Vault {
-  constructor(root, { dirs, vaultName = null, searchCache = null } = {}) {
+  constructor(root, { dirs, vaultName = null, searchCache = null, enableParallel = true } = {}) {
     this.root = resolve(root);
     this.vaultName = vaultName;
     this.dirs = dirs || this._detectDirs() || DEFAULT_DIRS;
     this._notesCache = null;
     this._notesCacheWithBody = null;
     this.searchCache = searchCache;
+
+    // Initiative B Integration
+    this.indexer = null;               // B2.1: Lazy initialized
+    this.queryCache = null;            // B2.2: Lazy initialized
+    this.parallelExecutor = null;      // B2.3: Lazy initialized
+    this.enableParallel = enableParallel;
+
+    // Metrics tracking for search operations
+    this.searchMetrics = {
+      queries: 0,
+      cacheHits: 0,
+      parallelUsed: 0
+    };
   }
 
   _detectDirs() {
@@ -33,6 +55,10 @@ export class Vault {
   invalidateCache() {
     this._notesCache = null;
     this._notesCacheWithBody = null;
+    // Also invalidate B2.2 query cache on vault changes
+    if (this.queryCache) {
+      this.queryCache.clearCache();
+    }
   }
 
   // ── Path helpers ─────────────────────────────────────
@@ -167,6 +193,56 @@ export class Vault {
     if (result.error || result.status === null || result.status >= 2) return null;
     if (result.status === 1) return new Set();               // no matches
     return new Set(result.stdout.trim().split('\n').filter(Boolean));
+  }
+
+  // ── Initiative B: Indexer initialization (B2.1) ──────
+
+  _initializeIndexer() {
+    if (this.indexer) return;
+    this.indexer = new VaultIndexer();
+  }
+
+  // ── Initiative B: Query cache initialization (B2.2) ──
+
+  _initializeQueryCache() {
+    if (this.queryCache) return;
+    this.queryCache = new VaultQueryCache();
+  }
+
+  // ── Initiative B: Parallel executor initialization (B2.3) ──
+
+  _initializeParallelExecutor() {
+    if (this.parallelExecutor) return;
+
+    // Ensure dependencies are initialized first
+    if (!this.indexer) this._initializeIndexer();
+    if (!this.queryCache) this._initializeQueryCache();
+
+    // Build index data for executor
+    const indexData = this._buildIndexForExecutor();
+
+    this.parallelExecutor = new ParallelQueryExecutor(indexData, {
+      maxConcurrent: 10,
+      defaultTimeout: 5000,
+      workerCount: 4
+    });
+
+    // Wire cache into executor
+    this.parallelExecutor.setCache(this.queryCache);
+  }
+
+  _buildIndexForExecutor() {
+    const notes = this.scanNotes({ includeBody: true });
+    return {
+      files: notes.reduce((acc, note) => {
+        acc[note.file] = {
+          content: note.body || '',
+          tags: note.tags || [],
+          modified: note.updated
+        };
+        return acc;
+      }, {})
+    };
   }
 
   // ── Search notes by keyword (relevance-scored) ─────
