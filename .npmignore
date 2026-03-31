@@ -1,33 +1,26 @@
-# Project subdirectories (not part of session-wrap-skill)
-dexapi/
-test-ydapi/
-sub2api-deploy/
-watermark\ 0324/
-0323/
-0325/
-Archived/
-
-# Local development
-.claude/
-obsidian/
-.zshrc-workspace
-login-agents.sh
-.session-wrap-trigger.json
+# Testing & Development
+test/
+docs/
+scaffold/templates/
+references/
 
 # Build artifacts
 dist/
 build/
-*.egg-info/
-__pycache__/
+coverage/
+.nyc_output/
+
+# Local development
+.claude/
+.cursor/
+.github/
+*.log
+*.tmp
 
 # Environment
 .env
 .env.local
 .env.*.local
-
-# Testing & CI
-coverage/
-.nyc_output/
 
 # OS
 .DS_Store
@@ -43,4 +36,3 @@ Thumbs.db
 .git/
 .gitignore
 .gitattributes
-.gitmodules

@@ -46,28 +46,25 @@ NS_0327
 scripts/login-agents.sh
 .session-wrap-trigger.json
 
-# Nested project metadata / local agent state
-.git/
+# Local development
 .agents/
 .claude/
 .codex/
-.coverage
 .venv/
+
+# Test artifacts
+tmp/
+coverage/
+.nyc_output/
 .pytest_cache/
 
-# Database & cache files
-*.rdb
-dump.db
-*.sqlite
-*.db
+# Dependencies
+node_modules/
 
-# Temporary & generated
+# Generated & temporary
 *.env.backup*
 .env.local
-checkpoints/
-node_modules/
-.DS_Store
+*.log
 *.tgz
-coverage/
-tmp/
-.nyc_output/
+dump.db
+*.db
