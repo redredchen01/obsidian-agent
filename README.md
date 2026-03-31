@@ -1,171 +1,516 @@
-# Workspace-0325 — 項目分類結構
+# Clausidian
 
-本工作區包含 APEX 自治開發引擎及其生態系統專案。
+CLI toolkit for AI agents to manage Obsidian vaults. Zero dependencies. Works with **any** AI agent — Claude Code, Cursor, Copilot, Cline, Windsurf, Codex, and more.
 
-> 📌 **詳細索引** → 見 [INDEX.md](INDEX.md)（完整的資料夾階層和說明）
+## Documentation
 
-```
-workspace-0325/
-├── 🏗️  core/apex/
-│   ├── src/.claude/         ← 引擎核心（agents|commands|hooks|references|scripts）
-│   ├── tests/               ← 722 個自動化測試
-│   ├── build/               ← 編譯和構建
-│   ├── docs/                ← 文檔（README|CHANGELOG|ARCHITECTURE）
-│   ├── output/              ← 執行輸出（dev|instincts）
-│   └── config/              ← 配置（CLAUDE.md|AGENTS.md）
-│
-├── 🛠️  skills/
-│   ├── active/              ← 4 個活躍 skills
-│   │   ├── session-wrap-skill/
-│   │   ├── version-sync-skill/
-│   │   ├── triple-publish-skill/
-│   │   └── static-ghost-skill/
-│   ├── build/               ← dist + node_modules
-│   └── reference/           ← 預留
-│
-├── 🎬 apps/static-ghost/
-│   ├── src/                 ← Python 源代碼
-│   ├── tests/               ← 20+ 個單元測試
-│   ├── build/               ← dist + egg-info
-│   ├── config/              ← package.json + pyproject.toml
-│   ├── output/              ← 執行輸出
-│   └── README.md
-│
-├── 📚 system/
-│   ├── reference/docs/      ← 參考文件
-│   └── output/              ← 生成輸出（dev|instincts）
-│
-├── ⚙️  config/              ← 配置和發行包
-├── README.md                ← 本文件（快速指南）
-└── INDEX.md                 ← 詳細索引 📖
-```
+| Document | Purpose |
+|----------|---------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System design, cache layers, performance optimization |
+| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
+| [docs/](docs/README.md) | Test plans, feature plans, analysis reports |
+| [scaffold/AGENT.md](scaffold/AGENT.md) | Agent quick-reference (commands, conventions) |
+| [skill/SKILL.md](skill/SKILL.md) | `/obsidian` skill for Claude Code |
 
----
+## Why
 
-## 各分類說明
+AI agents are great at managing knowledge, but they need structure. `clausidian` provides:
 
-### 🏗️ core/ — 引擎層
-**APEX** (Autonomous Pipeline EXecution Engine)
-- 50-stage 開發管線，從需求 → 研究 → 設計 → 實作 → 審查 → 測試 → 提交 → 發布 → 運維 → 演化 → 自治
-- 支援 16 個專門化 agent、15 個自動化 hook、9 個技術棧插件
-- 雙適配器設計（Claude + Codex）
-- 見：`core/apex/README.md`
+- **Structured vault** with frontmatter conventions, templates, and auto-linking
+- **CLI interface** that any agent can call — no agent-specific integration needed
+- **Automatic indices** — tag index, knowledge graph, directory indexes
+- **Agent configs** generated for Claude Code, Cursor, Copilot out of the box
 
-### 🛠️ skills/ — Skills 層（可裝到任何 AI agent）
+Your agent reads the vault's `AGENT.md`, learns the conventions, and uses `clausidian` CLI to create notes, journals, reviews — all with proper metadata and bidirectional links.
 
-| Skill | 用途 | 平台 |
-|-------|------|------|
-| **session-wrap-skill** | 自動保存上下文、記憶持久化、跨 session 無縫接續 | Claude Code, Cursor, Codex, 19+ |
-| **version-sync-skill** | 升版時自動同步 README、CHANGELOG、所有文件 | Claude Code, Cursor, Codex, 10+ |
-| **triple-publish-skill** | 自動偵測專案、同步版本、發布到 GitHub + npm + PyPI | Claude Code, Cursor, Codex, 10+ |
-| **static-ghost-skill** | 視頻水印移除工具的 skill 包裝 | Claude Code, Cursor, 支援調用 static-ghost |
+## Install
 
-### 🎬 apps/ — 獨立應用
-
-**static-ghost** — 視頻去水印工具
-- 用 LaMa inpainting 移除固定位置的水印（TV logo、網站水印、角落文字等）
-- FFmpeg + IOPaint 管線，支援多區域、自動偵測、交互式選擇
-- CLI + Python API
-- 見：`apps/static-ghost/README.md`
-
-### 📚 system/ — 系統基礎設施
-
-| 目錄 | 內容 |
-|------|------|
-| **dev/** | SOP 產出（specs、knowledge、logs） |
-| **docs/** | 項目文件 |
-| **instincts/** | 動態學習系統（自動捕獲工具呼叫、提煉最佳實踐） |
-
-### ⚙️ config/ — 配置與元資料
-
-- **CLAUDE.md** — Claude Code 的完整配置（SOP 規則、MCP 觸發、Pipeline 定義）
-- **AGENTS.md** — Codex/多 agent 的配置
-- **\*.skill** / **\*.zip** — 發行包
-
----
-
-## 快速啟動
-
-### 1. 查看 APEX 引擎
 ```bash
-cd core/apex/docs
-cat README.md          # 50-stage 管線說明
-cat CHANGELOG.md       # 版本歷史（v8.1.0）
+npm install -g clausidian
 ```
 
-### 2. 安裝 Skills 到本地
+## Quick Start
+
 ```bash
-# session-wrap
-cd skills/active/session-wrap-skill
-npx session-wrap-skill install
+# Install
+npm install -g clausidian
 
-# triple-publish
-cd skills/active/triple-publish-skill
-npx triple-publish-skill install
+# Initialize a new vault
+clausidian init ~/my-vault
+cd ~/my-vault
 
-# version-sync
-cd skills/active/version-sync-skill
-npx version-sync-skill install
+# Setup Claude Code integration (MCP server + /obsidian skill)
+clausidian setup ~/my-vault
+
+# Create today's journal
+clausidian journal
+
+# Create a project note
+clausidian note "Build API" project --tags "backend,api"
+
+# Capture an idea
+clausidian capture "Use vector search for note retrieval"
+
+# Search notes
+clausidian search "API" --type resource
+
+# List active projects
+clausidian list project --status active
+
+# Generate weekly review
+clausidian review
+
+# Generate monthly review
+clausidian review monthly
+
+# What links to this note?
+clausidian backlinks "build-api"
+
+# Update a note's metadata
+clausidian update "build-api" --status active --summary "Core API"
+
+# Archive a completed project
+clausidian archive "old-project"
+
+# Vault statistics
+clausidian stats
+
+# Generate Mermaid knowledge graph
+clausidian graph
+
+# Find orphan notes (no inbound links)
+clausidian orphans
+
+# Tag management
+clausidian tag list
+clausidian tag rename "old-tag" "new-tag"
+
+# Rebuild indices
+clausidian sync
+
+# Rename a note (updates all references)
+clausidian rename "build-api" "API Gateway"
+
+# Move note to a different type
+clausidian move "my-idea" project
+
+# Merge two notes
+clausidian merge "draft-api" "build-api"
+
+# Find duplicate notes
+clausidian duplicates --threshold 0.4
+
+# Find broken links
+clausidian broken-links
+
+# Batch operations
+clausidian batch tag --type idea --add "needs-review"
+clausidian batch archive --tag "deprecated"
+clausidian batch update --type project --set-status active
+
+# Export / Import
+clausidian export vault-backup.json
+clausidian export --format markdown --type project
+clausidian import notes.json
+
+# Regex search
+clausidian search "API.*v[23]" --regex
+
+# Smart linking
+clausidian link --dry-run          # preview missing links
+clausidian link                    # create bidirectional links
+
+# Activity timeline
+clausidian timeline --days 7
+clausidian timeline --type project
+
+# Vault quality
+clausidian validate
+clausidian relink --dry-run        # preview broken link fixes
+clausidian relink                  # auto-fix broken links
+
+# Pin favorites
+clausidian pin "important-note"
+clausidian pin list
+clausidian unpin "important-note"
+
+# Daily dashboard
+clausidian daily
+
+# Improvement suggestions
+clausidian suggest
+
+# Word count stats
+clausidian count
+clausidian count --type project
+
+# Pending tasks
+clausidian agenda
+clausidian agenda --all
+
+# Vault changelog
+clausidian changelog --days 14
+
+# Graph exploration
+clausidian neighbors "my-project" --depth 3
+
+# Serendipity
+clausidian random 3
+clausidian random --type idea
+
+# What to work on
+clausidian focus
 ```
 
-### 3. 使用視頻去水印
+## Vault Structure
+
+After `clausidian init`, your vault looks like:
+
+```
+my-vault/
+├── areas/          # Long-term focus areas
+├── projects/       # Concrete projects with goals
+├── resources/      # Reference materials
+├── journal/        # Daily logs & weekly reviews
+├── ideas/          # Draft ideas
+├── templates/      # Note templates ({{}} placeholders)
+├── _index.md       # Vault index
+├── _tags.md        # Tag → note mapping (auto-generated)
+├── _graph.md       # Knowledge graph (auto-generated)
+├── CONVENTIONS.md  # Writing & agent rules
+├── AGENT.md        # Agent instructions
+├── .claude/commands/  # Claude Code slash commands
+├── .cursor/rules/     # Cursor rules
+└── .github/copilot/   # Copilot instructions
+```
+
+## How It Works
+
+### For Humans
+1. Open the vault in Obsidian
+2. Start your AI agent in the vault directory
+3. The agent reads `AGENT.md` and knows how to operate
+
+### For Agents
+The agent uses CLI commands to manage notes:
+
 ```bash
-cd apps/static-ghost
-pip install -e ".[dev]"
-static-ghost pick video.mp4 --dilation 15 -o clean.mp4
+# The agent runs these commands in your terminal
+clausidian note "Learn Rust" project --tags "coding,learning"
+clausidian capture "Idea for a new feature"
+clausidian sync
 ```
 
+Each command:
+- Creates notes with proper frontmatter
+- Automatically finds and links related notes
+- Updates tag index (`_tags.md`) and knowledge graph (`_graph.md`)
+- Maintains bidirectional `related` links
+
+### Frontmatter Schema
+
+Every note has structured YAML frontmatter:
+
+```yaml
 ---
-
-## 整體架構
-
-```
-                    APEX 引擎（core/）
-                    ↙           ↓           ↘
-              Skills 層      應用層      系統層
-          (skills/)         (apps/)    (system/)
-              ↓              ↓           ↓
-    [session-wrap]  [static-ghost]  [dev/docs]
-    [version-sync]      + API      [instincts]
-    [triple-publish]
-    [static-ghost-sk]
-```
-
-**工作流**：
-1. 用戶在任何 AI agent（Claude Code、Cursor 等）中說「發布」或「升版」
-2. Agent 加載對應 skill（從 `config/` → `skills/`）
-3. Skill 呼叫 APEX 引擎的相應 stage（如 S10 Release、version-sync）
-4. 完成自動化流程
-
+title: "My Note"
+type: project          # area | project | resource | journal | idea
+tags: [backend, api]
+created: 2026-03-27
+updated: 2026-03-27
+status: active         # active | draft | archived
+summary: "One-line description for agent retrieval"
+related: ["[[other-note]]", "[[another-note]]"]
 ---
-
-## 文件導航
-
-| 資源 | 路徑 | 說明 |
-|------|------|------|
-| **APEX 架構** | `core/apex/docs/README.md` | 50-stage 完整說明 |
-| **APEX 更新** | `core/apex/docs/CHANGELOG.md` | 版本歷史（v8.1.0） |
-| **記憶系統** | `skills/active/session-wrap-skill/README.md` | 19+ 平台支援 |
-| **版本同步** | `skills/active/version-sync-skill/README.md` | 文件同步詳解 |
-| **三管道發布** | `skills/active/triple-publish-skill/README.md` | GitHub + npm + PyPI |
-| **視頻去水印** | `apps/static-ghost/README.md` | 使用說明 + API 文檔 |
-| **配置規則** | `config/CLAUDE.md` | SOP、MCP、Pipeline 定義 |
-| **詳細索引** | `INDEX.md` | 完整的資料夾階層説明 |
-
----
-
-## 分類原則
-
-```
-src/    = 源代碼和核心邏輯
-tests/  = 測試檔案
-build/  = 編譯輸出和發行版
-docs/   = 文檔
-output/ = 自動生成的檔案（.gitignore）
-config/ = 配置檔
 ```
 
----
+## Commands
 
-**更新日期**：2026-03-31
-**架構版本**：8.1.0 (APEX) + skills 生態
+| Command | Description |
+|---------|-------------|
+| `init <path>` | Initialize a new vault with templates & agent configs |
+| `journal` | Create/open today's journal entry |
+| `note <title> <type>` | Create a note (area/project/resource/idea) |
+| `capture <idea>` | Quick idea capture to `ideas/` |
+| `read <note>` | Read a note's full content (supports `--section`) |
+| `recent [days]` | Show recently updated notes (default: 7 days) |
+| `delete <note>` | Delete a note and clean up references |
+| `search <keyword>` | Full-text search across all notes |
+| `list [type]` | List notes with filters |
+| `review` | Generate weekly review from journals |
+| `review monthly` | Generate monthly review from weekly reviews & journals |
+| `sync` | Rebuild `_tags.md` and `_graph.md` indices |
+| `backlinks <note>` | Show notes that link to a given note |
+| `update <note>` | Update note frontmatter (status, tags, summary) |
+| `archive <note>` | Set note status to archived |
+| `stats` | Show vault statistics (counts, top tags, orphans) |
+| `graph` | Generate Mermaid knowledge graph diagram |
+| `orphans` | Find notes with no inbound links |
+| `tag list` | List all tags with counts |
+| `tag rename <old> <new>` | Rename a tag across the vault |
+| `patch <note>` | Edit a section by heading (`--heading`, `--append/--prepend/--replace`) |
+| `rename <note> <title>` | Rename a note and update all references |
+| `move <note> <type>` | Move note to a different type/directory |
+| `merge <source> <target>` | Merge source note into target (body + tags + refs) |
+| `duplicates` | Find potentially duplicate notes by similarity |
+| `broken-links` | Find broken `[[wikilinks]]` pointing to non-existent notes |
+| `batch update` | Batch update matching notes (`--set-status`, `--set-summary`) |
+| `batch tag` | Batch add/remove tags (`--add`, `--remove`) |
+| `batch archive` | Batch archive matching notes |
+| `export [output]` | Export notes to JSON or markdown (`--format json\|markdown`) |
+| `import <file>` | Import notes from JSON or markdown file |
+| `link` | Auto-link related but unlinked notes (`--dry-run`, `--threshold`) |
+| `timeline` | Chronological activity feed (`--days`, `--type`, `--limit`) |
+| `validate` | Check frontmatter completeness and find issues |
+| `pin <note>` | Pin a note as favorite |
+| `unpin <note>` | Unpin a note |
+| `pin list` | Show all pinned notes |
+| `relink` | Fix broken links with closest matches (`--dry-run`) |
+| `suggest` | Actionable vault improvement suggestions (orphans, stale notes, tag consolidation) |
+| `daily` | Daily dashboard (journal status, activity, pinned, projects) |
+| `count` | Word/line/note count statistics (`--type`) |
+| `agenda` | Pending TODO items from journals & projects (`--days`, `--all`) |
+| `changelog [output]` | Generate vault changelog from recent activity (`--days`) |
+| `neighbors <note>` | Show connected notes within N hops (`--depth`) |
+| `random [count]` | Pick random note(s) for serendipitous review |
+| `focus` | Suggest what to work on next (pinned > momentum > stale > ideas) |
+| `health` | Vault health scoring (completeness, connectivity, freshness, organization) |
+| `setup [vault-path]` | Install MCP server + `/obsidian` skill for Claude Code |
+| `watch` | Auto-rebuild indices on file changes |
+| `serve` | Start MCP server (stdio transport) |
+| `hook <event>` | Handle agent hook events |
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--vault <path>` | Vault root (default: cwd or `$OA_VAULT`) |
+| `--type <type>` | Filter by note type |
+| `--tag <tag>` | Filter by tag |
+| `--status <status>` | Filter by status |
+| `--recent <days>` | Show notes updated in last N days |
+| `--date <YYYY-MM-DD>` | Specify date for journal/review |
+| `--year <YYYY>` | Year for monthly review |
+| `--month <MM>` | Month for monthly review (1-12) |
+| `--summary <text>` | Set note summary (for update) |
+| `--tags <a,b,c>` | Set tags (for note/update) |
+| `--regex` | Treat search keyword as regex pattern |
+| `--threshold <0-1>` | Duplicate similarity threshold (default: 0.5) |
+| `--format <json\|md>` | Export format (default: json) |
+| `--set-status <status>` | New status for batch update |
+| `--add <tag>` | Tag to add (batch tag) |
+| `--remove <tag>` | Tag to remove (batch tag) |
+| `--all` | Scan all notes for agenda (not just recent) |
+| `--depth <N>` | Max hops for neighbors (default: 2) |
+| `--dry-run` | Preview changes without applying (for link, relink) |
+| `--days <N>` | Days to look back for timeline (default: 30) |
+| `--limit <N>` | Max entries for timeline (default: 50) |
+
+## Fuzzy Note Lookup
+
+Commands that take a note name support fuzzy matching — no need to type the exact filename:
+
+```bash
+# Exact
+clausidian read build-api
+
+# Case-insensitive
+clausidian read Build-API
+
+# Partial match
+clausidian read vector          # finds "vector-search"
+
+# Title match
+clausidian read "Build API"     # finds "build-api"
+```
+
+Works with: `read`, `delete`, `update`, `archive`, `patch`, `backlinks`, `rename`, `move`, `merge`, `pin`, `unpin`.
+
+## Search Relevance
+
+Search results are ranked by relevance score:
+
+| Match Location | Score |
+|---------------|-------|
+| Title | 10 |
+| Filename | 8 |
+| Tags | 5 |
+| Summary | 3 |
+| Body text | 1 |
+
+```bash
+clausidian search "API"         # title matches appear first
+clausidian search "API.*v2" --regex   # regex pattern matching
+```
+
+## JSON Output
+
+All commands support `--json` for machine-readable output:
+
+```bash
+clausidian search "API" --json
+clausidian stats --json
+clausidian list project --status active --json
+```
+
+## Heading-Level Edits
+
+Edit specific sections of a note without rewriting the whole file:
+
+```bash
+# Append to a section
+clausidian patch "my-project" --heading "TODO" --append "- [ ] New task"
+
+# Replace section content
+clausidian patch "my-project" --heading "Notes" --replace "Updated notes here"
+
+# Read a section
+clausidian patch "my-project" --heading "TODO"
+```
+
+## Claude Code Setup (One Command)
+
+```bash
+clausidian setup ~/my-vault
+```
+
+This automatically:
+1. Installs the `/obsidian` skill to `~/.claude/skills/obsidian/`
+2. Registers the MCP server in `~/.claude/.mcp.json`
+3. After restart, type `/obsidian` in any Claude Code session to manage your vault
+
+## MCP Server
+
+Run as an [MCP](https://modelcontextprotocol.io/) server for AI assistants (Claude Desktop, Cursor, etc.):
+
+```json
+{
+  "mcpServers": {
+    "clausidian": {
+      "command": "clausidian",
+      "args": ["serve", "--vault", "/path/to/vault"]
+    }
+  }
+}
+```
+
+Exposes 44 tools: journal, note, capture, search, list, read, recent, delete, backlinks, update, archive, patch, stats, orphans, graph, health, sync, tag_list, tag_rename, rename, move, merge, duplicates, broken_links, batch_update, batch_tag, batch_archive, export, neighbors, random, focus, and more.
+
+## Vault Health
+
+```bash
+clausidian health
+```
+
+Scores your vault across 4 dimensions (0-100 each):
+- **Completeness** — frontmatter quality (title, type, tags, summary, created)
+- **Connectivity** — links and relationships between notes
+- **Freshness** — how recently notes were updated
+- **Organization** — tags, types, naming conventions, summaries
+
+## Agent Hooks
+
+Integrate with your agent's hook system for automatic journaling:
+
+### Claude Code
+
+Add to your Claude Code settings (`~/.claude/settings.json`):
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "clausidian hook session-stop --vault ~/my-vault"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Cron / LaunchD
+
+```bash
+# Daily backfill — creates journal from git history
+clausidian hook daily-backfill --vault ~/my-vault --scan-root ~/projects
+
+# Weekly review
+clausidian review --vault ~/my-vault
+
+# Monthly review
+clausidian review monthly --vault ~/my-vault
+```
+
+## Knowledge Precipitation (v0.9+)
+
+Five automated rules that help knowledge settle from journals into permanent notes:
+
+| Rule | Command | What it does |
+|------|---------|-------------|
+| A1: Promotion Suggestions | `review` | Scans weekly journals for topics appearing 2+ days → suggests promotion to projects/resources |
+| A2: Idea Temperature | `health` | Tracks idea freshness: new, active, frozen (14d), archive (30d) |
+| A3: Staleness Detection | `review monthly` | Flags resources >60d stale, active projects >30d dormant, dead ideas |
+| A4: Conclusion Extraction | `hook session-stop` | Auto-tags journals with #conclusion or #resolved based on content |
+| A5: Link Suggestions | `sync` | Finds note pairs sharing 2+ tags but missing related links |
+
+These rules run automatically as part of existing commands — no extra setup needed. Over time, they ensure your vault stays organized: ideas get promoted or archived, stale notes get flagged, and connections between notes are surfaced.
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OA_VAULT` | Default vault path | cwd |
+| `OA_TIMEZONE` | Timezone for dates | UTC |
+
+## Agent Compatibility
+
+`clausidian init` generates config files for multiple agents:
+
+| Agent | Config Location |
+|-------|----------------|
+| Claude Code | `.claude/commands/` (slash commands) |
+| Cursor | `.cursor/rules/obsidian.md` |
+| GitHub Copilot | `.github/copilot/instructions.md` |
+| Any agent | `AGENT.md` (universal instructions) |
+
+All agents read `AGENT.md` which tells them to use the `clausidian` CLI. No agent-specific code needed.
+
+## Customization
+
+### Templates
+Edit files in `templates/` to customize note structure. Use `{{PLACEHOLDER}}` syntax.
+
+### Conventions
+Edit `CONVENTIONS.md` to change frontmatter rules, naming conventions, or agent behavior.
+
+### Language
+Templates ship in English. Replace template content with your preferred language — the CLI doesn't care about content language, only the `{{}}` placeholders.
+
+## Migration from obsidian-agent
+
+If you're upgrading from `obsidian-agent`:
+
+```bash
+npm uninstall -g obsidian-agent
+npm install -g clausidian
+```
+
+The CLI commands and vault structure are fully compatible — only the binary name changed.
+
+## Development
+
+```bash
+npm test
+```
+
+Requires Node.js >= 18. Tests use `node:test` — zero dev dependencies.
+
+## License
+
+MIT
