@@ -15,17 +15,23 @@ import { updateFrontmatter } from './frontmatter-helper.mjs';
 import { VaultIndexer } from './vault-indexer.mjs';
 import { VaultQueryCache } from './vault-query-cache.mjs';
 import { ParallelQueryExecutor } from './parallel-query-executor.mjs';
+import EventBus from './events/event-bus.mjs';
+import EventHistory from './events/event-history.mjs';
 
 const DEFAULT_DIRS = ['areas', 'projects', 'resources', 'journal', 'ideas'];
 
 export class Vault {
   constructor(root, { dirs, vaultName = null, searchCache = null, enableParallel = true } = {}) {
     this.root = resolve(root);
-    this.vaultName = vaultName;
+    this.vaultName = vaultName || 'default';
     this.dirs = dirs || this._detectDirs() || DEFAULT_DIRS;
     this._notesCache = null;
     this._notesCacheWithBody = null;
     this.searchCache = searchCache;
+
+    // v3.5 Event System
+    this.eventBus = new EventBus(this);
+    this.eventHistory = new EventHistory(this);
 
     // Initiative B Integration
     this.indexer = null;               // B2.1: Lazy initialized
@@ -101,8 +107,20 @@ export class Vault {
     const p = this.path(...args);
     const dir = dirname(p);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    const isNew = !existsSync(p);
     writeFileSync(p, content);
     this.invalidateCache();
+
+    // Emit event (v3.5)
+    if (isNew) {
+      const filename = args[args.length - 1].replace('.md', '');
+      this.eventBus.emit('note:created', { note: filename, dir: args[0] });
+      this.eventHistory.append('note:created', { note: filename, dir: args[0] });
+    } else {
+      const filename = args[args.length - 1].replace('.md', '');
+      this.eventBus.emit('note:updated', { note: filename, dir: args[0] });
+      this.eventHistory.append('note:updated', { note: filename, dir: args[0] });
+    }
   }
 
   // ── Frontmatter parsing ──────────────────────────────

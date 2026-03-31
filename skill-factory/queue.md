@@ -42,6 +42,9 @@
 - [x] 2026-03-31 | P1 | /version-bump-auto | Auto-detect semver, update CHANGELOG, tag git | built: 2026-03-31
 - [x] 2026-03-31 | P1 | /reference-digest | Collect top resources by tag, generate digest | built: 2026-03-31
 
-- [ ] 2026-03-31 | P1 | /npm-publish-auto | npm 包自動發布 — 檢測版本、更新 package.json、發布到 npm | npm-publishing-automation
-- [ ] 2026-03-31 | P1 | /analytics-report | Phase 10 深度指標分析 — GA4 聚合、Custom Dashboard 生成、Scheduled 報表 | phase-10-analytics
-- [ ] 2026-03-31 | P1 | /agent-dashboard | Agent 系統監控儀表板 — 顯示 6 agents 健康度、fallback 鏈、週報聚合 | agent-trace-system
+- [x] 2026-03-31 | P1 | /npm-publish-auto | npm 包自動發布 — 檢測版本、更新 package.json、發布到 npm | built: 2026-03-31
+- [x] 2026-03-31 | P1 | /analytics-report | Phase 10 深度指標分析 — GA4 聚合、Custom Dashboard 生成、Scheduled 報表 | built: 2026-03-31
+- [x] 2026-03-31 | P1 | /agent-dashboard | Agent 系統監控儀表板 — 顯示 6 agents 健康度、fallback 鏈、週報聚合 | built: 2026-03-31
+
+- [x] 2026-03-31 | P1 | /prompt-ab-test | Prompt A/B 測試框架 — 自動比較不同 prompt 效果 + 版本控制 | built: 2026-03-31
+- [x] 2026-03-31 | P1 | /journal-auto-log | Obsidian journal 自動同步 — 將操作記錄自動寫回 journal，形成閉環 | built: 2026-03-31

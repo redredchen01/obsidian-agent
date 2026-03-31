@@ -1,7 +1,7 @@
 ---
 title: "feat: Add text-cover pipeline mode for floating text watermarks"
 type: feat
-status: active
+status: completed
 date: 2026-03-31
 ---
 
@@ -26,7 +26,7 @@ date: 2026-03-31
 
 - R1. 使用者只需提供輸入影片，系統自動偵測文字水印並遮蓋輸出
 - R2. 偵測後端可選（PaddleOCR / EasyOCR），允許速度/精度切換
-- R3. 遮蓋策略可選（gaussian_blur / solid / lama），滿足不同品質需求
+- R3. 遮蓋策略可選（gaussian_blur / solid），滿足快速批次處理需求（lama 策略不符合「秒級批次」目標，移除出本 mode）
 - R4. 新模式透過 `--pipeline-mode text-cover` CLI flag 啟用，不破壞現有 `watermark` 模式
 - R5. API 同步支援新欄位（`pipeline_mode`, `text_detect_backend`, `cover_strategy`）
 - R6. 每個 feature-bearing 模組有獨立測試，可用合成帶文字影格驗證
@@ -38,7 +38,8 @@ date: 2026-03-31
 - **不包含** 原始 `watermark` mode pipeline 的任何改動（tracking / temporal_ref / spatial_restore / integration）
 - **不包含** 訓練或微調 OCR 模型
 - **不包含** 即時（realtime）處理優化
-- delogo ffmpeg 整合**僅作為靜態位置選項**，浮動水印使用 Python 路徑
+- **不包含** `lama` cover strategy（LaMa 推理不符合「秒級批次處理」目標；需要 LaMa 修復的用例繼續使用現有 `watermark` mode + `restoration_backend=learned`）
+- **不包含** delogo ffmpeg 整合（此版本不實作；後續 milestone 可追加 `--cover-strategy delogo` CLI shortcut）
 
 ## Context & Research
 
@@ -72,19 +73,20 @@ date: 2026-03-31
 
 ## Key Technical Decisions
 
-- **不新增新 pipeline class，但 text-cover 直接繞過 SpatialRestorer**：`_load_or_generate_masks()` 返回 mask 後，text-cover mode 應**直接呼叫 `TextCoverRestorer`**，不走 `SpatialRestorer` factory。原因：`SpatialRestorer.restore()` 的 reference-copy 三步邏輯（複製參考幀→識別剩餘區域→inpainting）對遮蓋策略毫無意義且有潛在副作用；`SpatialRestorer` 介面要求 `references` 參數，text-cover 模式下 temporal_ref phase 可能被跳過導致 `references` 為空
-- **gaussian_blur / solid 路徑跳過 tracking + temporal_ref**：`_track_and_stabilize()` 和 `_fetch_temporal_references()` 對 gaussian_blur / solid 遮蓋策略無貢獻（OCR 已做時序採樣），計算浪費且 CSRT tracker 可能二次漂移 OCR 結果。`VideoPipeline.run()` 加入 mode guard：`text-cover + (gaussian_blur|solid)` 直接跳到 `_apply_cover(frames, masks)` phase
-- **lama cover strategy 複用 LamaRestorer（單幀 loop）**：`LamaRestorer` 繼承 `DLRestorationBackend` 介面為 `restore_single(frame, mask)`，非多幀接口；Unit 4 需在 `_apply_cover()` 中自行包裝多幀 loop，不走 `DLSpatialRestorer` 包裝器
-- **偵測間隔 + 線性插值**（非逐幀偵測）：每 N 幀偵測一次（預設 N=10），中間幀 bbox 線性插值。浮動水印漂移慢，插值誤差可接受
+- **不新增新 pipeline class，text-cover 直接繞過 SpatialRestorer（不走 factory）**：`TextCoverRestorer` 為獨立 class，Unit 4 的 `_apply_cover()` 直接實例化，不透過 `SpatialRestorer.__init__` factory entry。原因：`SpatialRestorer.restore()` 返回 `(restored_frames, applied_masks)` tuple，其三步邏輯（複製參考幀→識別剩餘→inpainting）對遮蓋毫無意義；Unit 2 不需在 SpatialRestorer factory 加入 text-cover entry（避免死代碼）
+- **text-cover 路徑跳過 tracking + temporal_ref + BoundaryBlender**：`VideoPipeline.run()` 加 mode guard：`text-cover` 模式直接從 `_load_or_generate_masks()` 跳到 `_apply_cover()`，跳過 Phase 2（tracking）、Phase 3（temporal_ref）、Phase 5（BoundaryBlender）。BoundaryBlender 不適合 cover 路徑（會把 blur 色塊滲出到周圍像素，產生暈圈）。僅保留 Phase 6（TemporalRefiner）防閃爍。`_apply_cover()` 明確返回純 `List[np.ndarray]`（非 tuple），與 `_integrate_and_blend()` 介面對齊
+- **lama 策略不在本 mode 支援**：LaMa 推理（CPU 3-10s/幀）無法滿足「秒級批次處理」目標；需要 LaMa 文字遮蓋的用例使用現有 `watermark` mode + `restoration_backend=learned`
+- **偵測間隔 + 線性插值（前提：勻速漂移水印）**：每 N 幀偵測一次（預設 N=10），中間幀 bbox 線性插值。前提：水印漂移為勻速；淡入淡出或間歇出現的水印需 `--detect-interval 1`。空 bbox 採樣點不參與插值（中間幀保持空）
 - **PaddleOCR 為 primary，EasyOCR 為 fallback**：PP-OCRv5 支援傾斜/旋轉文字；EasyOCR 作為 CPU-only 降級選項
 - **Optional extra 依賴**：新依賴加入 `pyproject.toml` `[text-cover]` extra group，不影響現有 install
+- **`_spatial_restoration()` 現有 tuple return bug 不在本次範圍**：`pipeline.py:219` 的 SpatialRestorer 呼叫已有 method kwarg bug；text-cover 路徑完全繞過此路徑，不引入也不修復，但 Unit 4 驗證需確認現有 watermark 路徑 regression test 仍通過
 
 ## Open Questions
 
 ### Resolved During Planning
 
 - **Q: 新增獨立 pipeline class 還是 branch？** → 使用 branch，mask 格式相同，不需複製 pipeline 邏輯
-- **Q: ffmpeg delogo 是否整合到 Python pipeline？** → 僅作為 CLI 的靜態遮蓋 shortcut（`--cover-strategy delogo` 直接調用 subprocess ffmpeg），不納入 Python frame-by-frame path
+- **Q: ffmpeg delogo 是否整合到 Python pipeline？** → **此版本不實作**，列為 future milestone。delogo 作為 `--cover-strategy` 選項需要 subprocess ffmpeg 整合 + 版本相容性測試，超出本次範圍
 - **Q: CUDA 衝突如何處理？** → 文件說明 + 建議 RapidOCR (ONNX) 替代；程式碼不強制處理，由使用者環境決定
 
 ### Deferred to Implementation
@@ -93,7 +95,7 @@ date: 2026-03-31
 - **EasyOCR bbox 格式轉換**：EasyOCR 返回四點格式，轉換到 `(x, y, w, h)` 的邊界確認需實測
 - **合成帶文字影格的最佳 OCR 偵測閾值**：實際合成測試後再定 `ocr_confidence_threshold` 預設值（初始建議 0.5）
 - **`SpatialRestorer.__init__` 現有 bug**：`pipeline.py:219` 傳 `method=self.config.restoration_method` 給 `SpatialRestorer`，但後者不接受 `method` kwarg（只有 `backend + radius`）——這是現有 bug，text-cover 路徑繞過 `SpatialRestorer`，不引入也不修復此 bug
-- **`_apply_cover()` 中 lama 路徑的 references 參數**：`LamaRestorer.restore_single(frame, mask)` 不需要 references；確認 `_apply_cover()` 在 lama 模式下不傳 references 即可
+- **OCR 信心閾值最佳值**：`ocr_confidence_threshold` 預設 0.5，實際合成測試後可能需調整；實作時以不同閾值對合成帶文字影格做一次 sweep，再定入預設值
 
 ## High-Level Technical Design
 
@@ -106,15 +108,15 @@ CLI / API
 PipelineConfig
   ├── pipeline_mode: "text-cover"
   ├── text_detect_backend: "paddleocr" | "easyocr"
-  ├── cover_strategy: "gaussian_blur" | "solid" | "lama"
+  ├── cover_strategy: "gaussian_blur" | "solid"   ← lama 已移除
   ├── detect_interval: int (default=10)
   ├── bbox_padding: int (default=6)
-  └── confidence_threshold: float (default=0.5)
+  └── ocr_confidence_threshold: float (default=0.5)
     │
     ▼
 VideoPipeline._load_or_generate_masks()
     │
-    ├── [watermark mode] ── 現有邏輯（ROI / mask video）
+    ├── [watermark mode] ── 現有完整 6-phase 流程（不改動）
     │
     └── [text-cover mode]
             │
@@ -124,21 +126,26 @@ VideoPipeline._load_or_generate_masks()
             └── EasyOCRDetector（fallback）
                 │
                 ▼
-            偵測採樣（每 detect_interval 幀）
+            偵測採樣（每 detect_interval 幀，空 bbox 不插值）
             + bbox padding
-            + 線性插值（中間幀）
+            + 線性插值（僅非空採樣點之間）
                 │
                 ▼
-            List[np.ndarray] masks（與現有格式相同）
+            List[np.ndarray] masks
                 │
-    ▼ （masks 格式相同，以下複用現有邏輯）
-    │
-    ├── [cover_strategy == gaussian_blur / solid]
-    │       → TextCoverRestorer（取代 SpatialRestorer）
-    │         在 _spatial_restoration() phase 執行
-    │
-    └── [cover_strategy == lama]
-            → 複用現有 LamaRestorer
+                ▼ （跳過 Phase 2 tracking + Phase 3 temporal_ref + Phase 5 BoundaryBlender）
+                │
+            _apply_cover(frames, masks)
+            → TextCoverRestorer（獨立 class，不走 SpatialRestorer factory）
+              ├── gaussian_blur: GaussianBlur on mask region
+              └── solid: fill mask region with color
+                │
+                ▼ （返回純 List[np.ndarray]，非 tuple）
+                │
+            Phase 6: TemporalRefiner 防閃爍（保留）
+                │
+                ▼
+            VideoWriter output
 ```
 
 ## Implementation Units
@@ -156,7 +163,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 1: TextDetector ABC + PaddleOCR / EasyOCR 後端**
+- [x] **Unit 1: TextDetector ABC + PaddleOCR / EasyOCR 後端**
 
 **Goal:** 實作文字偵測抽象層，提供兩個具體後端，輸出統一格式 bbox list
 
@@ -192,10 +199,11 @@ graph TB
 **Verification:**
 - `pytest tests/test_text_detect.py` 全部通過
 - `EasyOCRDetector` 不需要 GPU 即可在 CI 通過
+- EasyOCR CI mock 策略：使用 `unittest.mock.patch` 替換 `easyocr.Reader` 實際推理（避免 CI 下載 ~100MB 模型），mock 返回固定 bbox 結果；實際模型推理僅在 integration test 標記（`@pytest.mark.integration`）中執行
 
 ---
 
-- [ ] **Unit 2: TextCoverRestorer（遮蓋策略）**
+- [x] **Unit 2: TextCoverRestorer（遮蓋策略）**
 
 **Goal:** 實作遮蓋 restorer，支援 gaussian_blur 和 solid 策略，遵循現有 `BaseRestorer` 介面
 
@@ -208,11 +216,11 @@ graph TB
 - Test: `tests/test_text_cover_restorer.py`
 
 **Approach:**
-- `TextCoverRestorer(BaseRestorer)`，接受 `cover_strategy: str`（"gaussian_blur" | "solid"）和 `blur_ksize: int`（預設 51，必須為奇數）
+- `TextCoverRestorer` 為**獨立 class，不繼承 BaseRestorer，不加入 SpatialRestorer factory**（避免死代碼；text-cover 路徑直接實例化，不走 factory）
+- 接受 `cover_strategy: str`（"gaussian_blur" | "solid"）和 `blur_ksize: int`（預設 51，必須為奇數）
 - `gaussian_blur`：對每個 mask 非零區域取 ROI，套用 `cv2.GaussianBlur`
 - `solid`：對 mask 非零區域填充指定 BGR color（預設純黑 `(0,0,0)`）
-- 在 `SpatialRestorer.__init__` 的 if/elif factory 加入 `"text-cover"` backend → 創建 `TextCoverRestorer`
-- `lama` strategy 在 Unit 4 透過直接呼叫 `LamaRestorer` 實現，不在此處處理
+- 核心方法：`cover(frames: List[np.ndarray], masks: List[np.ndarray]) -> List[np.ndarray]`，返回純 list（非 tuple）
 
 **Patterns to follow:**
 - `src/pipelines/spatial_restore.py:TeleaRestorer` — 同介面
@@ -230,7 +238,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 3: PipelineConfig 新增 text-cover 欄位**
+- [x] **Unit 3: PipelineConfig 新增 text-cover 欄位**
 
 **Goal:** 在 `PipelineConfig` dataclass 加入新模式所需的配置欄位，有合理預設值
 
@@ -246,7 +254,7 @@ graph TB
 ```
 pipeline_mode: str = "watermark"             # "watermark" | "text-cover"
 text_detect_backend: str = "easyocr"         # "paddleocr" | "easyocr"
-cover_strategy: str = "gaussian_blur"        # "gaussian_blur" | "solid" | "lama"
+cover_strategy: str = "gaussian_blur"        # "gaussian_blur" | "solid"
 detect_interval: int = 10                    # 偵測採樣間隔（幀數）
 bbox_padding: int = 6                        # bbox 擴展像素
 ocr_confidence_threshold: float = 0.5       # OCR 信心度閾值（避免與 Tracker.confidence_threshold 衝突）
@@ -262,25 +270,24 @@ blur_ksize: int = 51                         # gaussian blur 核大小
 
 ---
 
-- [ ] **Unit 4: VideoPipeline 加入 text-cover mode branch**
+- [x] **Unit 4: VideoPipeline 加入 text-cover mode branch**
 
-**Goal:** 在 `_load_or_generate_masks()` 加入 text-cover 分支，以及在 `_spatial_restoration()` 根據 `cover_strategy` 選擇 restorer
+**Goal:** 在 `_load_or_generate_masks()` 加入 text-cover 分支，在 `run()` 加 mode guard 跳過 tracking/temporal_ref/BoundaryBlender，並新增 `_apply_cover()` 私有方法
 
 **Requirements:** R1, R3
 
 **Dependencies:** Unit 1, Unit 2, Unit 3
 
 **Files:**
-- Modify: `src/pipeline.py` — `VideoPipeline._load_or_generate_masks()` + `_spatial_restoration()`
+- Modify: `src/pipeline.py` — `VideoPipeline._load_or_generate_masks()` + `run()`（加 mode guard + `_apply_cover()`）
 - Test: `tests/test_pipeline_text_cover.py`
 
 **Approach:**
 - `_load_or_generate_masks()` 加 branch：`if self.config.pipeline_mode == "text-cover": masks = self._detect_text_regions(frames)`
 - 新私有方法 `_detect_text_regions(frames) -> List[np.ndarray]`：初始化 `TextDetector`，呼叫 `TextDetectionSampler`，將 bbox list 轉為 mask ndarray
-- `VideoPipeline.run()` 加 mode guard：`text-cover` 且 `cover_strategy in ("gaussian_blur", "solid")` 時，**跳過** `_track_and_stabilize()` + `_fetch_temporal_references()`，直接呼叫新私有方法 `_apply_cover(frames, masks)`
-- `_apply_cover()` 為 text-cover 專屬 phase：gaussian_blur / solid 呼叫 `TextCoverRestorer`；lama 呼叫 `LamaRestorer.restore_single()` loop
-- `lama` strategy 路徑仍執行 `_fetch_temporal_references()`（`LamaRestorer` 不需要 references，但保留以避免 `run()` 控制流複雜化——此為 deferred 優化）
-- `integration.py` 的 `BoundaryBlender` 對所有路徑仍執行（保留輸出穩定性）
+- `VideoPipeline.run()` 加 mode guard：`pipeline_mode == "text-cover"` 時，**跳過** Phase 2（`_track_and_stabilize()`）、Phase 3（`_fetch_temporal_references()`）、Phase 5（`BoundaryBlender`），直接呼叫新私有方法 `_apply_cover(frames, masks)`，再進入 Phase 6（`TemporalRefiner`）
+- `_apply_cover(frames, masks) -> List[np.ndarray]`：直接實例化 `TextCoverRestorer`，呼叫 `cover(frames, masks)`，**明確返回純 `List[np.ndarray]`（非 tuple）**；不呼叫 lama（lama 不在本 mode 範圍）
+- BoundaryBlender **不執行**於 text-cover 路徑（blur/solid cover 下 BoundaryBlender 會把遮蓋色滲出到周圍像素，產生暈圈 artifact）
 - 現有 `watermark` mode 路徑：**不改動任何邏輯**
 
 **Patterns to follow:**
@@ -288,7 +295,8 @@ blur_ksize: int = 51                         # gaussian blur 核大小
 - `src/pipeline.py` — 懶加載 `self._restorer`
 
 **Test scenarios:**
-- Happy path: 合成 3 幀帶文字影片（用 `cv2.putText`），`pipeline_mode="text-cover"`, `cover_strategy="gaussian_blur"` → pipeline run 成功，輸出影片帶文字區域被模糊
+- Happy path: 合成 3 幀帶文字影片（用 `cv2.putText`），`pipeline_mode="text-cover"`, `cover_strategy="gaussian_blur"` → pipeline run 成功，輸出影片帶文字區域被模糊；mask 邊界外一圈像素與原始幀相同（pixel-level assertion）
+- BoundaryBlender bypass: text-cover mode 下驗證 `BoundaryBlender` 未被呼叫（`unittest.mock.patch` 斷言零呼叫次數）
 - Integration: `pipeline_mode="watermark"`（現有模式）在加入新 branch 後繼續正常執行 → regression test
 - Error path: `pipeline_mode="text-cover"` 且 OCR 後端未安裝 → pipeline 在 `_detect_text_regions` 階段 fail fast 並拋有意義的錯誤，不等到後續 phase 才 crash
 - Edge case: 偵測結果為空（影片無文字）→ masks 全零，pipeline 繼續執行，輸出影片與輸入相同
@@ -299,7 +307,7 @@ blur_ksize: int = 51                         # gaussian blur 核大小
 
 ---
 
-- [ ] **Unit 5: API schema + bridge 更新**
+- [x] **Unit 5: API schema + bridge 更新**
 
 **Goal:** 讓 REST API 支援 `text-cover` 模式的三個新參數
 
@@ -316,10 +324,11 @@ blur_ksize: int = 51                         # gaussian blur 核大小
 - `PipelineParams` 加入：
   - `pipeline_mode: str = Field(default="watermark", pattern="^(watermark|text-cover)$")`
   - `text_detect_backend: str = Field(default="easyocr", pattern="^(paddleocr|easyocr)$")`
-  - `cover_strategy: str = Field(default="gaussian_blur", pattern="^(gaussian_blur|solid|lama)$")`
+  - `cover_strategy: str = Field(default="gaussian_blur", pattern="^(gaussian_blur|solid)$")`
   - `detect_interval: int = Field(default=10, ge=1, le=100)`
   - `bbox_padding: int = Field(default=6, ge=0, le=30)`
-  - `confidence_threshold: float = Field(default=0.5, ge=0.0, le=1.0)`
+  - `ocr_confidence_threshold: float = Field(default=0.5, ge=0.0, le=1.0)`
+  - `blur_ksize: int = Field(default=51, ge=1)`
 - `params_to_config()` 透傳新欄位到 `PipelineConfig`（一對一映射，無額外邏輯）
 
 **Test scenarios:**
@@ -334,7 +343,7 @@ blur_ksize: int = 51                         # gaussian blur 核大小
 
 ---
 
-- [ ] **Unit 6: CLI 更新**
+- [x] **Unit 6: CLI 更新**
 
 **Goal:** 在 `vwrs.py` 的 `process` subcommand 加入 `--pipeline-mode` 等新 flag
 
@@ -348,9 +357,10 @@ blur_ksize: int = 51                         # gaussian blur 核大小
 **Approach:**
 - 加入 `--pipeline-mode choices=["watermark", "text-cover"] default="watermark"`
 - 加入 `--text-detect-backend choices=["paddleocr", "easyocr"] default="easyocr"`
-- 加入 `--cover-strategy choices=["gaussian_blur", "solid", "lama"] default="gaussian_blur"`
+- 加入 `--cover-strategy choices=["gaussian_blur", "solid"] default="gaussian_blur"`
 - 加入 `--detect-interval type=int default=10`
 - 加入 `--bbox-padding type=int default=6`
+- 加入 `--blur-ksize type=int default=51`
 - 更新 `epilog` 範例 docstring 加入 `text-cover` 使用範例
 - 在 `main()` 的 `PipelineConfig` 構建處傳遞新 args
 
@@ -366,7 +376,7 @@ blur_ksize: int = 51                         # gaussian blur 核大小
 
 ## System-Wide Impact
 
-- **Interaction graph:** text-cover mode 繞過 `_track_and_stabilize()` 和 `_fetch_temporal_references()`（僅 gaussian_blur / solid），直接進 `_apply_cover()`；lama strategy 仍需 `_apply_cover()` 中自行 loop 呼叫 `LamaRestorer.restore_single()`。`integration.py` 的 boundary blending 和 temporal refining 仍執行（保留輸出穩定性）
+- **Interaction graph:** text-cover mode 完全跳過 Phase 2（`_track_and_stabilize()`）、Phase 3（`_fetch_temporal_references()`）、Phase 5（`BoundaryBlender`）；`BoundaryBlender` 不執行於 text-cover 路徑（對 blur/solid cover 會產生暈圈 artifact）。僅保留 Phase 6（`TemporalRefiner`）防閃爍。現有 `watermark` mode 路徑完整 6-phase 不變
 - **Celery task gap（已知）：** `src/tasks/video.py:process_video` task signature 目前是 stub（模擬 300 幀），不呼叫 `VideoPipeline`；新參數 `pipeline_mode` 等未反映在 task 層。本計劃範圍是 API + worker processor path（`api/worker/processor.py` 走 `VideoPipeline`），Celery task 路徑不在範圍內，但需在 Scope Boundaries 標記為後續同步需求
 - **Error propagation:** OCR 後端載入失敗在 `_detect_text_regions()` 即 fail fast；`detect_interval=0` 需在 `TextDetectionSampler` 入口驗證（dataclass 不做 validation）
 - **State lifecycle risks:** `PaddleOCR` / `EasyOCR` 模型懶加載，每次 job 新建實例；`api/worker/processor.py` `max_concurrent=2` 情境下，兩個並發 text-cover job 各自持有一份 OCR 模型 + 完整 frames list，peak memory 較現有模式高，需在 README 標注

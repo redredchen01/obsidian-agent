@@ -10,7 +10,7 @@ date: 2026-03-31
 ## Overview
 
 在 `0331-1/` 目錄建立一個全新的**獨立本地工具**，用於：
-1. 自動偵測影片中漂浮的文字浮水印
+1. 自動偵測影片中動態漂浮的文字浮水印
 2. 對偵測區域生成穩定遮罩
 3. 使用傳統 CV 方法去除（遮蓋/模糊/delogo）
 4. 疊加使用者自訂的新浮水印
@@ -29,10 +29,15 @@ date: 2026-03-31
 
 ## Requirements Trace
 
+**核心偵測與去除**
 - R1. 使用者只需提供輸入影片即可自動偵測並去除文字水印（零 ROI 前置操作）
-- R2. 偵測後端可選（EasyOCR / PaddleOCR），允許速度/精度切換
+- R2. MVP 偵測後端固定為 EasyOCR（CPU/GPU 均可）；PaddleOCR 預留後端抽象，v2 實作
 - R3. 去除策略可選（gaussian_blur / solid / delogo），滿足不同品質需求
+
+**新水印與輸出**
 - R4. 支援疊加新浮水印（文字 or PNG）
+
+**開發者體驗（DX）**
 - R5. 必須有可視化 debug 輸出（每個 stage 均可預覽）
 - R6. 所有 Stage 透過統一 YAML config 驅動
 - R7. CLI 支援 `--only-detect` / `--only-mask` / `--only-remove` 等分段執行
@@ -46,6 +51,9 @@ date: 2026-03-31
 - **不包含** 批次多影片並行處理（MVP 只處理單支 mp4）
 - **不包含** 訓練或微調 OCR 模型
 - **不包含** SAM2 精確多邊形 mask
+- **MVP 輸入限制**：建議 ≤ 10 分鐘、≤ 1080p；全幀載入 RAM，超過限制需分段處理（v2）
+- **MVP 輸出不保留音訊**：cv2.VideoWriter 不支援音軌；需音訊時使用 `ffmpeg_utils.mux_audio` 後處理（文件說明）
+- **包含（MVP）** ffmpeg delogo 作為靜態位置快捷：`--cover-strategy delogo` 走 subprocess，不走 frame-by-frame Python 路徑
 
 ## Context & Research
 
@@ -60,7 +68,7 @@ date: 2026-03-31
 
 ### Institutional Learnings
 
-- 新 backend/strategy 遵循 ABC + if/elif factory，避免過早引入 registry 框架
+- 新 backend/strategy 使用 if/elif 分支即可；有第二個真實後端時再 extract ABC（YAGNI — MVP 不預建只服務一個後端的抽象層）
 - `detect_interval`（採樣間隔 + 線性插值）是 OCR overhead 的實用緩解方案
 - OCR bbox 通常略小於實際字元邊界，需 +4-8px padding
 
@@ -76,11 +84,11 @@ date: 2026-03-31
 ## Key Technical Decisions
 
 - **Stage-based pipeline，非 class hierarchy**：每個 Stage 是獨立 callable module，`run_pipeline.py` 依序調用。理由：降低耦合，任一 stage 可單獨替換或跳過，調試時直接跑單 stage
-- **EasyOCR 作為 MVP 唯一後端**：無 PaddlePaddle 依賴，CPU 可用，四點 bbox 格式穩定。PaddleOCR 在 Unit 3 中保留 ABC，實作延後到迭代二
-- **逐幀偵測 → 採樣插值**：預設每 `detect_interval=10` 幀偵測一次，中間幀線性插值 bbox。理由：EasyOCR CPU 約 100-300ms/幀，全幀處理 30fps 影片不可行
+- **EasyOCR 作為 MVP 唯一後端**：無 PaddlePaddle 依賴，CPU 可用，四點 bbox 格式穩定。Unit 3 不預建 ABC；PaddleOCR 在 v2 有需要時才 extract interface
+- **偵測採樣，插值由 Stage C 負責**：Stage B 只偵測關鍵幀（每 `detect_interval=10` 幀），非關鍵幀填 `None`。所有跨幀補間與平滑統一由 Stage C WatermarkTracker 負責，避免 Stage B 做不完整的插值邏輯
 - **IoU + 中心距離雙重匹配做追蹤**：避免單純 IoU 在小 bbox 時失效，相鄰幀 bbox 匹配後做 EMA（指數加權平均）平滑，消除抖動
 - **去除優先 gaussian_blur**：100x 快於 inpainting，對「合規遮蓋」場景已足夠；delogo 作為 CLI-only 靜態快捷；lama 作為未來選項預留介面
-- **新水印後處理**：必須在去除舊水印**之後**疊加。MVP 用 ffmpeg subprocess 的 `drawtext` / `overlay` filter，避免引入新依賴
+- **Stage F 為 file-based subprocess**：Stage E 完成後 VideoWriter 寫出 `<output_stem>_cleaned_tmp.mp4`，Stage F ffmpeg subprocess 讀取此暫存檔疊加水印輸出最終 mp4，暫存檔由 pipeline 結束後清理。架構圖中 Stage F 不回傳 `final_frames`，而是直接寫出 `output.mp4`。ffmpeg 最終輸出指定 `-c:v libx264 -preset fast -crf 23` 確保播放器相容性
 - **Config 以 Pydantic + YAML 雙層驗證**：YAML 加載後透過 Pydantic model 驗證，提供有意義的錯誤訊息，而不是 KeyError 在運行時爆炸
 - **debug 輸出作為一等公民**：每個 Stage 接受可選的 `debug_dir` 參數，輸出視覺化結果。`--save-debug` flag 統一控制
 
@@ -115,51 +123,90 @@ run_pipeline.py  ─────── PipelineConfig
         │
         ├─── Stage A: VideoReader
         │         └── frames: List[np.ndarray], metadata: VideoMeta
+        │         ⚠️  全幀載入 RAM（MVP 限制 ≤ 10min / 1080p）
         │
-        ├─── Stage B: TextDetector (EasyOCR/PaddleOCR)
-        │         + CandidateFilter
+        ├─── Stage B: EasyOCRDetector + CandidateFilter
         │         └── raw_detections: Dict[frame_idx, List[BBox]]
-        │                            (BBox = namedtuple x,y,w,h,conf)
+        │             (key frames only; non-key frames → empty list)
+        │             (BBox = namedtuple x,y,w,h,conf)
         │
         ├─── Stage C: WatermarkTracker + TemporalSmoother
         │         └── smoothed_tracks: List[Track]
-        │                            (Track = List[BBox | None] per frame)
+        │             (handles gap fill + EMA smoothing for ALL frames)
         │
-        ├─── Stage D: MaskBuilder + MaskRender
-        │         └── masks: List[np.ndarray]  (uint8 0/255, same HxW as frame)
+        ├─── Stage D: MaskBuilder
+        │         └── masks: List[np.ndarray]  (uint8 0/255, HxW)
         │
-        ├─── Stage E: Remover (blur | solid | delogo)
+        ├─── Stage E: Remover (blur | solid)
         │         └── cleaned_frames: List[np.ndarray]
         │
-        ├─── Stage F: WatermarkOverlay (text | image)
-        │         └── final_frames: List[np.ndarray]
+        ├─── VideoWriter → <stem>_cleaned_tmp.mp4
         │
-        └─── VideoWriter → output.mp4
+        ├─── Stage F: WatermarkOverlay (ffmpeg subprocess)
+        │         reads: <stem>_cleaned_tmp.mp4
+        │         writes: output.mp4 (-c:v libx264)
+        │         cleanup: delete <stem>_cleaned_tmp.mp4
+        │
+        └─── stdout summary: "Stage B: N/M frames detected (K tracks)"
+             WARNING if N == 0
 
 Debug path (--save-debug):
   Stage B → debug/detection_overlay.mp4
   Stage D → debug/mask_preview.mp4
-  Stage E → debug/removed_preview.mp4
-  Stage F → debug/final_preview.mp4
+  Stage E → debug/removed_preview.mp4 + debug/detections.json (cache)
+  Stage F → output.mp4 (final is the debug artifact)
 ```
 
 ## Implementation Units
 
 ```mermaid
 graph TB
-    U1[Unit 1: Scaffold + Config Schema] --> U2[Unit 2: Stage A Video IO]
-    U1 --> U3[Unit 3: Stage B TextDetector]
+    U0[Unit 0: EasyOCR PoC Validation] --> U1[Unit 1: Scaffold + Config Schema]
+    U1 --> U2[Unit 2: Stage A Video IO]
+    U1 --> U3[Unit 3: Stage B EasyOCRDetector]
     U2 --> U8[Unit 8: Pipeline Orchestrator]
     U3 --> U4[Unit 4: Stage C Tracker + Smoother]
     U4 --> U5[Unit 5: Stage D Mask Builder]
     U5 --> U6[Unit 6: Stage E Removers]
     U3 --> U9[Unit 9: Debug Exports]
     U5 --> U9
-    U6 --> U7[Unit 7: Stage F New Watermark]
+    U6 --> U7[Unit 7: Stage F ffmpeg Watermark]
     U7 --> U8
     U9 --> U8
     U8 --> U10[Unit 10: CLI Entrypoint]
 ```
+
+---
+
+- [ ] **Unit 0: EasyOCR PoC Validation（Blocking Gate）**
+
+**Goal:** 在投入 10 個 unit 之前，驗證 EasyOCR 在目標水印類型上的實際 detection rate，確保核心假設成立
+
+**Requirements:** R1（零 ROI 自動偵測的前提）
+
+**Dependencies:** None（此 unit 是整個計劃的 prerequisite gate）
+
+**Files:**
+- Create: `scripts/poc_easyocr.py`（一次性驗證腳本，不進 src/）
+
+**Approach:**
+- 收集 3-5 個代表性目標影片片段（含不同透明度、不同背景複雜度的浮水印）
+- 對每個片段提取 10-20 個代表幀，跑 `easyocr.Reader(["ch_sim", "en"]).readtext(frame)`
+- 記錄：detection rate（有偵測到水印的幀佔比）、confidence 分布、bbox 位置準確性
+- **Gate：detection rate ≥ 70%** → 繼續 Unit 1-10；否則選擇以下 fallback 之一並更新計劃：
+  - (A) Unit 3 前加 CLAHE 預處理（`cv2.createCLAHE().apply(frame_gray)`）
+  - (B) 降低 R1，允許可選的 `hint_bbox` config 欄位（使用者提供水印位置範圍）
+  - (C) 改用 frame difference 偵測（不依賴 OCR 識字能力）
+
+**Patterns to follow:**
+- 簡單腳本，不需框架，100 行內完成
+
+**Test scenarios:**
+- Test expectation: none — 這是探索性驗證，結果決定後續方向
+
+**Verification:**
+- 完成 poc_easyocr.py 執行，記錄 detection rate 數字
+- 基於結果決定：繼續 / 選擇 fallback A/B/C 並更新 Unit 3 的 Approach
 
 ---
 
@@ -253,54 +300,52 @@ graph TB
 
 ---
 
-- [ ] **Unit 3: Stage B — TextDetector ABC + EasyOCR Backend + CandidateFilter**
+- [ ] **Unit 3: Stage B — EasyOCRDetector + TextDetectionSampler + CandidateFilter**
 
-**Goal:** 定義偵測抽象層，實作 EasyOCR 後端，實作候選過濾器（面積/邊緣/置信度）
+**Goal:** 實作 EasyOCR 偵測器（無 ABC），採樣關鍵幀，過濾候選 bbox；不做跨幀插值（插值由 Stage C 負責）
 
 **Requirements:** R1, R2, R8
 
 **Dependencies:** Unit 1
 
 **Files:**
-- Create: `src/detect/text_detector.py`
+- Create: `src/detect/easyocr_detector.py`
 - Create: `src/detect/candidate_filter.py`
+- Create: `src/detect/detection_sampler.py`
 - Test: `tests/test_text_detector.py`
 
 **Approach:**
-- `TextDetector` ABC：
-  - `detect(frame: np.ndarray) -> List[BBox]` — 單幀偵測
-  - `BBox = namedtuple("BBox", ["x", "y", "w", "h", "conf"])`
-- `EasyOCRDetector(TextDetector)`：
-  - `__init__(languages, gpu, confidence_threshold)` — 懶加載 `easyocr.Reader`（第一次 `detect()` 時初始化）
+- `BBox = namedtuple("BBox", ["x", "y", "w", "h", "conf"])` — 定義在 `src/detect/easyocr_detector.py`
+- `EasyOCRDetector`（直接 class，無 ABC）：
+  - `__init__(languages, gpu, confidence_threshold, bbox_padding)` — 懶加載 `easyocr.Reader`（第一次 `detect()` 時初始化）
+  - 首次初始化前檢查 model cache（`~/.EasyOCR/`），若不存在則 print 提示訊息（下載約 200MB）
   - 四點 bbox 轉矩形：取 x_min, y_min, x_max, y_max，加 `bbox_padding`，clamp 到 frame 邊界
   - 過濾 `conf < confidence_threshold`
-- `PaddleOCRDetector`（stub）：ABC 相同介面，`detect()` 拋 `NotImplementedError("PaddleOCR backend not yet implemented")`
-- `create_detector(backend: str, **kwargs) -> TextDetector` — if/elif factory，未知 backend 拋 `ValueError`
 - `TextDetectionSampler`：
-  - `sample_and_interpolate(frames, detector, detect_interval) -> Dict[int, List[BBox]]`
-  - 每 `detect_interval` 幀偵測一次，中間幀對 bbox (x,y,w,h) 做線性插值
-  - 插值時保留最近偵測到的 conf 值（不插值 conf）
+  - `sample_keyframes(frames, detector, detect_interval) -> Dict[int, List[BBox]]`
+  - 每 `detect_interval` 幀偵測一次，非關鍵幀返回空 list（不插值）
+  - 偵測完成後輸出摘要：`"Stage B: detected in N/{total} key frames"`
 - `CandidateFilter`：
   - `filter(detections: List[BBox], frame_h, frame_w, cfg: DetectionConfig) -> List[BBox]`
   - 過濾小於 `min_area` 的 bbox
   - `edge_region_only=True` 時只保留靠近邊緣（距邊 < 15% 寬/高）的 bbox
+- v2 後端：若未來需要 PaddleOCR，建立 `PaddleOCRDetector` class 並抽 ABC；不在 MVP 預建
 
 **Patterns to follow:**
-- ABC + if/elif factory（參考 VWRS `spatial_restore.py` 模式，但重新實作）
-- 懶加載：`self._reader = None`，first call 時初始化
+- 懶加載：`self._reader = None`，first `detect()` call 時初始化
+- 不預建只有一個具體實作的 ABC
 
 **Test scenarios:**
-- Happy path: 合成帶白色文字的 BGR frame（`cv2.putText` 寫大字）→ `EasyOCRDetector.detect()` 返回非空 BBox list，第一個 bbox 涵蓋文字區域（面積 > 0）
-- Happy path: `TextDetectionSampler` 對 30 幀（每 10 幀一組相同 bbox）→ 插值後 30 幀全有 bbox
+- Happy path: 合成帶白色文字的 BGR frame（`cv2.putText` 寫大字）→ `EasyOCRDetector.detect()` 返回非空 BBox list，bbox 涵蓋文字區域（面積 > 0）
+- Happy path: `TextDetectionSampler.sample_keyframes(30幀, interval=10)` → 只有 frame 0, 10, 20 有偵測（dict keys），其餘 frames 不在 dict 中
 - Happy path: `CandidateFilter` 移除 `min_area=1000` 以下的小 bbox
 - Edge case: 純黑 frame（無文字）→ `detect()` 返回空 list，不拋例外
 - Edge case: `bbox_padding` 使 bbox 超出 frame → clamp 後 x+w <= frame_w, y+h <= frame_h
-- Error path: `create_detector("paddleocr")` → 當前返回的 stub 在 `detect()` 時拋 `NotImplementedError`
-- Error path: `create_detector("unknown_backend")` → `ValueError`
+- Error path: `easyocr` 未安裝 → `detect()` 拋 `ImportError` 帶明確安裝提示
 
 **Verification:**
 - `pytest tests/test_text_detector.py` 全部通過
-- `EasyOCRDetector` 在 CPU-only 環境通過（`gpu=False`）
+- `EasyOCRDetector` 在 CPU-only 環境通過（`gpu=False`，mock `easyocr.Reader`）
 
 ---
 
@@ -394,24 +439,26 @@ graph TB
 **Dependencies:** Unit 5
 
 **Files:**
-- Create: `src/remove/remover_base.py`（ABC）
 - Create: `src/remove/blur_remover.py`
 - Create: `src/remove/cover_remover.py`（solid）
 - Create: `src/remove/delogo_remover.py`（靜態 ffmpeg shortcut）
 - Test: `tests/test_removers.py`
 
 **Approach:**
-- `BaseRemover` ABC：`remove(frame: np.ndarray, mask: np.ndarray) -> np.ndarray`
-- `BlurRemover(BaseRemover)`：
-  - `cv2.GaussianBlur` 整幀後，用 mask 混合：`result = np.where(mask[...,None]==255, blurred, frame)`
-  - `blur_ksize` 必須為奇數
-- `SolidCoverRemover(BaseRemover)`：
-  - mask 區域填充 `solid_color`（BGR tuple）
-- `DelogoRemover`（**不是** `BaseRemover`，不處理 frame）：
+- `BlurRemover`（直接 class，無 ABC）：
+  - `cv2.GaussianBlur` 整幀後，用 mask 做 alpha blend：
+    `mask_f = mask.astype(float) / 255`（支援 feather 軟邊 0-255 值域）
+    `result = (mask_f[...,None] * blurred + (1 - mask_f[...,None]) * frame).astype(np.uint8)`
+  - `blur_ksize` 必須為奇數；`remove(frame, mask) -> np.ndarray`
+- `SolidCoverRemover`（直接 class，無 ABC）：
+  - 同樣使用 alpha blend：`solid = np.full_like(frame, solid_color)`
+    `result = (mask_f[...,None] * solid + (1 - mask_f[...,None]) * frame).astype(np.uint8)`
+  - `remove(frame, mask) -> np.ndarray`
+- `DelogoRemover`（獨立 class，不處理 frame）：
   - `apply(input_path, output_path, static_box: BBox)` — subprocess ffmpeg delogo
   - 僅適用靜態位置（CLI 快捷路徑），不用在 frame-by-frame pipeline 中
-- `create_remover(strategy: str, cfg: RemoveConfig) -> BaseRemover` — if/elif factory
-- `remove_sequence(frames: List[np.ndarray], masks: List[np.ndarray], remover: BaseRemover) -> List[np.ndarray]` — batch apply
+- 策略選擇：`run_pipeline.py` 直接 if/elif 實例化對應 class；v2 有第三種策略時再 extract ABC
+- `remove_sequence(frames, masks, remover) -> List[np.ndarray]` — batch apply，定義在 `run_pipeline.py`
 
 **Test scenarios:**
 - Happy path: `BlurRemover.remove(frame, mask)` → mask 區域像素值不同於原始（已模糊），非 mask 區域像素值相同
@@ -440,15 +487,16 @@ graph TB
 - Test: `tests/test_watermark.py`
 
 **Approach:**
-- MVP 路徑：先用 `VideoWriter` 寫出 cleaned frames，再用 ffmpeg subprocess 疊加水印，得到最終輸出
-  - `text_watermark.py`：`apply(input_path, output_path, cfg: WatermarkConfig)` → 調用 `ffmpeg_utils.add_watermark_text`
-  - `image_watermark.py`：`apply(input_path, output_path, cfg: WatermarkConfig)` → 調用 `ffmpeg_utils.add_watermark_image`
+- Stage F 為 file-based pipeline：`run_pipeline.py` 在 Stage E 後呼叫 `VideoWriter.write_frames` 寫出 `<output_stem>_cleaned_tmp.mp4`，Stage F 讀取此暫存檔疊加水印
+  - `text_watermark.py`：`apply(input_path, output_path, cfg: WatermarkConfig)` → 調用 `ffmpeg_utils.add_watermark_text`；ffmpeg 參數加 `-c:v libx264 -preset fast -crf 23` 確保播放器相容
+  - `image_watermark.py`：`apply(input_path, output_path, cfg: WatermarkConfig)` → 調用 `ffmpeg_utils.add_watermark_image`；同上 libx264 參數
+  - 暫存檔生命週期：Stage F 執行完成後，`run_pipeline.py` 統一清理 `_cleaned_tmp.mp4`（`os.remove`），不論成功或異常（try/finally）
 - `WatermarkConfig` 欄位對應：
   - `position`：`"top-left" | "top-right" | "bottom-left" | "bottom-right" | "center"`
   - 轉換為 ffmpeg `x=`/`y=` 表達式（如 `x=W-w-margin:y=margin`）
   - `opacity`：ffmpeg `alpha=` 值
   - `start_sec` / `end_sec`：ffmpeg `enable='between(t,start,end)'`
-- `create_watermark_applier(wm_type: str) -> Callable`：if/elif factory，選擇 text or image
+- 策略選擇：`run_pipeline.py` 直接 if/elif 依 `wm_config.type` 調用 text 或 image applier；不預建 factory
 
 **Test scenarios:**
 - Happy path: `WatermarkConfig(type="text", text="TEST", position="bottom-right")` → `text_watermark.apply` 呼叫 ffmpeg 不報錯，輸出文件存在
@@ -479,10 +527,13 @@ graph TB
 - `PipelineMode` enum：`FULL | ONLY_DETECT | ONLY_MASK | ONLY_REMOVE`
 - 執行流程：
   1. Load frames（Stage A）
-  2. `ONLY_DETECT` → 跑 B，輸出 debug detection video，return
-  3. `ONLY_MASK` → 跑 B+C+D，輸出 debug mask video，return
-  4. `ONLY_REMOVE` → 跑 B+C+D+E，輸出 cleaned video，return
-  5. `FULL` → 跑 B+C+D+E+F，輸出最終 output + debug（if enabled）
+  2. Stage B：若 `debug_dir/detections.json` 存在則載入 cache，跳過 EasyOCR；否則跑偵測後序列化到 JSON
+     - 偵測完成後 stdout：`"Stage B: detected in N/{total} key frames (K tracks expected)"`
+     - 若 N == 0：`WARNING: Stage B detected 0 frames. Check confidence_threshold or use hint_bbox.`
+  3. `ONLY_DETECT` → 輸出 debug detection video，return
+  4. `ONLY_MASK` → 跑 C+D，輸出 debug mask video，return（Stage B 結果從 cache 或本次偵測取得）
+  5. `ONLY_REMOVE` → 跑 C+D+E，輸出 cleaned video，return
+  6. `FULL` → 跑 C+D+E → `VideoWriter` 寫出 `_cleaned_tmp.mp4` → Stage F ffmpeg subprocess 疊加水印輸出 `output.mp4` → try/finally 清理暫存檔
 - Stage 間透過 Python 函數調用，不透過磁碟 I/O 傳遞中間幀（debug 輸出是額外的 side effect）
 - 進度輸出：`tqdm` 包裝 frame loop，顯示每 Stage 進度
 
@@ -574,6 +625,7 @@ argparse 定義：
 - **Error propagation:** 每個 Stage 的 RuntimeError / FileNotFoundError 應允許向上傳播到 `run_pipeline`，統一在最外層 catch 並輸出友好錯誤訊息後 exit(1)
 - **State lifecycle risks:** EasyOCR Reader 為進程內單例（懶加載後複用），不跨 pipeline run 共享；`VideoCapture` 在 `read_frames` 完成後立即 `release()`
 - **API surface parity:** 本工具無 REST API，所有操作透過 CLI。未來若要加 API，`run_pipeline` 設計為 pure function，方便包裝
+- **Detection cache:** Stage B 結果序列化至 `debug/detections.json`；`ONLY_MASK` / `ONLY_REMOVE` 模式優先載入 cache，跳過 EasyOCR 重跑。cache 存在時 Stage B 執行時間從數分鐘降至 <1 秒
 - **Integration coverage:** Unit 8 的 e2e test 是唯一驗證完整 A→F 鏈路的測試；各 Stage 的 unit test 用合成數據，不需實際影片文件
 - **Unchanged invariants:** configs/demo.yaml 是使用者調試的入口，任何 schema 變更必須向後相容或更新 demo.yaml
 
@@ -584,9 +636,9 @@ argparse 定義：
 | EasyOCR 漏偵測半透明水印 | 暴露 `confidence_threshold`（預設 0.5）；文件說明可嘗試 CLAHE 前處理；`detect_interval=1` 強制逐幀 |
 | EasyOCR CPU 速度（100-300ms/幀）導致處理過慢 | detect_interval 採樣插值大幅降低 OCR 呼叫次數；文件說明 GPU 選項 |
 | bbox 插值誤差（水印快速移動） | `detect_interval` 可設為 1（逐幀）犧牲速度換精度 |
-| OpenCV VideoWriter 輸出 mp4 可能在某些播放器無法播放 | 文件說明可用 ffmpeg re-encode：`ffmpeg -i out.mp4 -c:v libx264 final.mp4` |
+| OpenCV VideoWriter codec 相容性 | Stage F ffmpeg subprocess 使用 `-c:v libx264 -preset fast -crf 23` 最終編碼，不依賴 mp4v；已設計在 pipeline 架構中 |
 | 新水印 ffmpeg subprocess 在無 ffmpeg 環境中失敗 | 啟動時 `shutil.which("ffmpeg")` 檢測，缺失時 early exit 帶明確提示 |
-| PaddleOCR 後端未實作導致使用者困惑 | `create_detector("paddleocr")` 的 stub `detect()` 拋 `NotImplementedError("PaddleOCR backend planned for v2")` |
+| _cleaned_tmp.mp4 暫存檔在異常時殘留 | `run_pipeline` 用 try/finally 確保清理；文件說明手動刪除方式 |
 
 ## Documentation / Operational Notes
 
