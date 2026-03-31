@@ -3,6 +3,7 @@
  */
 import { Vault } from '../vault.mjs';
 import { SearchCache } from '../search-cache.mjs';
+import { formatTable } from '../table-formatter.mjs';
 
 // Global cache instance (shared across searches in same CLI invocation)
 let searchCache = new SearchCache();
@@ -22,11 +23,7 @@ export function search(vaultRoot, keyword, { type, tag, status, regex } = {}) {
   }
 
   console.log(`\nFound ${results.length} result(s) for "${keyword}":\n`);
-  console.log('| File | Type | Status | Summary |');
-  console.log('|------|------|--------|---------|');
-  for (const r of results.slice(0, 20)) {
-    console.log(`| [[${r.file}]] | ${r.type} | ${r.status} | ${r.summary || '-'} |`);
-  }
+  console.log(formatTable(results, ['file', 'type', 'status', 'summary'], { wikilink: ['file'], limit: 20 }));
 
   return { results };
 }

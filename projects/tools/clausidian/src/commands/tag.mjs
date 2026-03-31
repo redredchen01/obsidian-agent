@@ -4,6 +4,7 @@
 import { Vault } from '../vault.mjs';
 import { IndexManager } from '../index-manager.mjs';
 import { todayStr } from '../dates.mjs';
+import { formatTable } from '../table-formatter.mjs';
 
 export function tagRename(vaultRoot, oldTag, newTag) {
   const vault = new Vault(vaultRoot);
@@ -51,11 +52,7 @@ export function tagList(vaultRoot) {
   }
 
   console.log(`\n${sorted.length} tag(s):\n`);
-  console.log('| Tag | Count |');
-  console.log('|-----|-------|');
-  for (const [tag, count] of sorted) {
-    console.log(`| ${tag} | ${count} |`);
-  }
+  console.log(formatTable(sorted.map(([tag, count]) => ({ tag, count })), ['tag', 'count']));
 
   return { tags: tagMap };
 }

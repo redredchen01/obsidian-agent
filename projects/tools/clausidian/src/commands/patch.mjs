@@ -3,6 +3,8 @@
  */
 import { Vault } from '../vault.mjs';
 import { todayStr } from '../dates.mjs';
+import { updateFrontmatterField } from '../frontmatter-helper.mjs';
+import { NoteNotFoundError, HeadingNotFoundError } from '../errors.mjs';
 
 export function patch(vaultRoot, noteName, { heading, append, prepend, replace } = {}) {
   const vault = new Vault(vaultRoot);
@@ -13,7 +15,7 @@ export function patch(vaultRoot, noteName, { heading, append, prepend, replace }
 
   const note = vault.findNote(noteName);
   if (!note) {
-    throw new Error(`Note not found: ${noteName}`);
+    throw new NoteNotFoundError(noteName);
   }
 
   const filePath = `${note.dir}/${note.file}.md`;
@@ -53,7 +55,7 @@ export function patch(vaultRoot, noteName, { heading, append, prepend, replace }
   }
 
   if (startIdx === -1) {
-    throw new Error(`Heading not found: "${heading}"`);
+    throw new HeadingNotFoundError(heading);
   }
 
   // Extract section content (lines between heading and next heading)
@@ -80,7 +82,7 @@ export function patch(vaultRoot, noteName, { heading, append, prepend, replace }
   const newContent = `${before}\n\n${newSection}\n\n${after}`.replace(/\n{3,}/g, '\n\n');
 
   // Update the `updated` field
-  const final = newContent.replace(/updated: "\d{4}-\d{2}-\d{2}"/, `updated: "${todayStr()}"`);
+  const final = updateFrontmatterField(newContent, 'updated', todayStr());
   vault.write(filePath, final);
 
   const op = replace !== undefined ? 'replaced' : append ? 'appended' : 'prepended';

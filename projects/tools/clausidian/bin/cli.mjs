@@ -8,6 +8,7 @@
 import { getCommand, getCommandNames } from '../src/registry.mjs';
 import { VaultRegistry } from '../src/vault-registry.mjs';
 import { resolveVault as resolveVaultPath } from '../src/vault-resolver.mjs';
+import { ClausidianError } from '../src/errors.mjs';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -15,12 +16,16 @@ const command = args[0];
 function levenshtein(a, b) {
   if (!a || !b) return Math.max((a || '').length, (b || '').length);
   const m = a.length, n = b.length;
-  const dp = Array.from({ length: m + 1 }, (_, i) => [i]);
-  for (let j = 1; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++)
-    for (let j = 1; j <= n; j++)
-      dp[i][j] = Math.min(dp[i-1][j] + 1, dp[i][j-1] + 1, dp[i-1][j-1] + (a[i-1] !== b[j-1] ? 1 : 0));
-  return dp[m][n];
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const curr = new Array(n + 1);
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + (a[i - 1] !== b[j - 1] ? 1 : 0));
+    }
+    prev = curr;
+  }
+  return prev[n];
 }
 
 function parseFlags(args) {
@@ -149,6 +154,10 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error(err.message);
+  if (err instanceof ClausidianError && !err.message.startsWith(err.code)) {
+    console.error(`[${err.code}] ${err.message}`);
+  } else {
+    console.error(err.message);
+  }
   process.exit(1);
 });

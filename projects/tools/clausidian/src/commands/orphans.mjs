@@ -2,6 +2,7 @@
  * orphans — find notes with no inbound links
  */
 import { Vault } from '../vault.mjs';
+import { formatTable } from '../table-formatter.mjs';
 
 export function orphans(vaultRoot) {
   const vault = new Vault(vaultRoot);
@@ -13,11 +14,7 @@ export function orphans(vaultRoot) {
   }
 
   console.log(`\n${results.length} orphan note(s) (no inbound links):\n`);
-  console.log('| File | Type | Status | Summary |');
-  console.log('|------|------|--------|---------|');
-  for (const r of results) {
-    console.log(`| [[${r.file}]] | ${r.type} | ${r.status} | ${r.summary || '-'} |`);
-  }
+  console.log(formatTable(results, ['file', 'type', 'status', 'summary'], { wikilink: ['file'] }));
 
   return { results };
 }
