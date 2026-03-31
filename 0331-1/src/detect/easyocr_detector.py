@@ -10,13 +10,6 @@ import numpy as np
 BBox = namedtuple("BBox", ["x", "y", "w", "h", "conf"])
 
 
-def _pad_clamp(x: int, y: int, w: int, h: int, pad: int, fw: int, fh: int) -> BBox:
-    x1 = max(0, x - pad)
-    y1 = max(0, y - pad)
-    x2 = min(fw, x + w + pad)
-    y2 = min(fh, y + h + pad)
-    return BBox(x=x1, y=y1, w=x2 - x1, h=y2 - y1, conf=0.0)
-
 
 class EasyOCRDetector:
     def __init__(

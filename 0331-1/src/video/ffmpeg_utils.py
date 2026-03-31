@@ -17,7 +17,7 @@ def _require_ffmpeg() -> str:
     return ffmpeg
 
 
-def _run(cmd: list) -> None:
+def _run(cmd: list[str]) -> None:
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(
@@ -110,6 +110,7 @@ def apply_delogo(
         ffmpeg, "-y", "-i", input_path,
         "-vf", f"delogo=x={x}:y={y}:w={w}:h={h}:band={band}:show=0",
         "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-c:a", "copy",
         output_path,
     ]
     _run(cmd)

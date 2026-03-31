@@ -23,7 +23,7 @@ class MaskBuilder:
 
         for track in tracks:
             for frame_idx, bbox in track.bboxes.items():
-                if bbox is None or frame_idx >= total_frames:
+                if bbox is None or frame_idx < 0 or frame_idx >= total_frames:
                     continue
                 x1 = max(0, bbox.x - expand_px)
                 y1 = max(0, bbox.y - expand_px)

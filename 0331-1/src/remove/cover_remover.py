@@ -14,7 +14,7 @@ class SolidCoverRemover:
         if mask.max() == 0:
             return frame.copy()
         solid = np.full_like(frame, self.solid_color)
-        mask_f = mask.astype(float) / 255.0
+        mask_f = mask.astype(np.float32) / 255.0
         result = (
             mask_f[..., None] * solid + (1 - mask_f[..., None]) * frame
         ).astype(np.uint8)

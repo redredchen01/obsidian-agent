@@ -1,7 +1,7 @@
 {
   "name": "clausidian",
   "version": "3.5.0",
-  "description": "CLI toolkit for AI agents to manage Obsidian vaults — journal, notes, search, index sync, and more",
+  "description": "CLI toolkit for AI agents to manage Obsidian vaults — journal, notes, search, plugins, automations, multi-vault workflows",
   "type": "module",
   "bin": {
     "clausidian": "bin/cli.mjs"

@@ -15,7 +15,7 @@ class BlurRemover:
         if mask.max() == 0:
             return frame.copy()
         blurred = cv2.GaussianBlur(frame, (self.blur_ksize, self.blur_ksize), 0)
-        mask_f = mask.astype(float) / 255.0
+        mask_f = mask.astype(np.float32) / 255.0
         result = (
             mask_f[..., None] * blurred + (1 - mask_f[..., None]) * frame
         ).astype(np.uint8)

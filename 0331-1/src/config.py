@@ -30,7 +30,7 @@ class DetectionConfig(BaseModel):
 
 
 class TrackingConfig(BaseModel):
-    center_dist_threshold: float = Field(80.0, ge=0.0)
+    center_dist_threshold: float = Field(80.0, gt=0.0)
     match_cost_threshold: float = Field(1.5, ge=0.0)
     ema_alpha: float = Field(0.5, ge=0.0, le=1.0)
     step_threshold: float = Field(50.0, ge=0.0)

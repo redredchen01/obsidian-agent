@@ -18,7 +18,8 @@ class TextDetectionSampler:
         min_area: int = 200,
         edge_region_only: bool = False,
     ):
-        assert detect_interval >= 1
+        if detect_interval < 1:
+            raise ValueError(f"detect_interval must be >= 1, got {detect_interval}")
         self.detector = detector
         self.detect_interval = detect_interval
         self.candidate_filter = candidate_filter or CandidateFilter()
