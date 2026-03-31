@@ -143,7 +143,7 @@ test('SearchCache disk persistence', async (t) => {
     cache.get('q1', {}); // hit
 
     const stats = cache.stats();
-    assert.ok(stats.size > 0, 'Cache size should be > 0');
+    assert.ok(stats.totalEntries > 0, 'Cache totalEntries should be > 0');
     assert.equal(stats.hits, 1, 'Should have 1 hit');
     assert.equal(stats.misses, 0, 'Should have 0 misses');
   });
