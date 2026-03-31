@@ -5,6 +5,7 @@ import { Vault } from '../vault.mjs';
 import { TemplateEngine } from '../templates.mjs';
 import { IndexManager } from '../index-manager.mjs';
 import { todayStr } from '../dates.mjs';
+import { updateFrontmatterField, updateFrontmatter } from '../frontmatter-helper.mjs';
 
 export function note(vaultRoot, title, type, { tags = [], goal = '', summary = '' } = {}) {
   const vault = new Vault(vaultRoot);
@@ -47,15 +48,11 @@ export function note(vaultRoot, title, type, { tags = [], goal = '', summary = '
   let content = tpl.render(templateName, vars);
 
   // Inject related links and tags into frontmatter
-  if (relatedLinks.length) {
-    content = content.replace(/related: \[\]/, `related: [${relatedLinks.map(l => `"${l}"`).join(', ')}]`);
-  }
-  if (tags.length) {
-    content = content.replace(/tags: \[\]/, `tags: [${tags.join(', ')}]`);
-  }
-  if (summary) {
-    content = content.replace(/summary: ""/, `summary: "${summary}"`);
-  }
+  const fmUpdates = {};
+  if (relatedLinks.length) fmUpdates.related = relatedLinks;
+  if (tags.length) fmUpdates.tags = tags;
+  if (summary) fmUpdates.summary = summary;
+  if (Object.keys(fmUpdates).length) content = updateFrontmatter(content, fmUpdates);
 
   vault.write(dir, `${filename}.md`, content);
   idx.updateDirIndex(dir, filename, summary || title);
@@ -67,14 +64,14 @@ export function note(vaultRoot, title, type, { tags = [], goal = '', summary = '
     const relContent = vault.read(relPath);
     if (relContent && !relContent.includes(`[[${filename}]]`)) {
       const updated = relContent.replace(
-        /related: \[(.*)]/,
-        (match, inner) => {
+        /^(related:) \[(.*)]$/m,
+        (_, prefix, inner) => {
           const existing = inner ? `${inner}, ` : '';
-          return `related: [${existing}"[[${filename}]]"]`;
+          return `${prefix} [${existing}"[[${filename}]]"]`;
         }
       );
       if (updated !== relContent) {
-        vault.write(relPath, updated.replace(/updated: "\d{4}-\d{2}-\d{2}"/, `updated: "${todayStr()}"`));
+        vault.write(relPath, updateFrontmatterField(updated, 'updated', todayStr()));
       }
     }
   }

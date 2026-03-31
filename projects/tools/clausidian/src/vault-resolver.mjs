@@ -17,6 +17,7 @@
 
 import { existsSync } from 'fs';
 import { resolve } from 'path';
+import { VaultError } from './errors.mjs';
 
 /**
  * Resolves vault path using precedence order with comprehensive error handling
@@ -35,16 +36,18 @@ export function resolveVault(flags, registry, fallbackPath) {
     const vault = registry.getByName(flags.vault);
     if (!vault) {
       const available = registry.list().map(v => v.name).join(', ') || '(none)';
-      throw new Error(
-        `E4: Vault not found: "${flags.vault}"\n\n` +
+      throw new VaultError(
+        'E4',
+        `Vault not found: "${flags.vault}"\n\n` +
         `Available vaults: ${available}\n` +
         `Tip: Use 'clausidian vault list' to see all registered vaults, ` +
         `or 'clausidian vault register <name> <path>'`
       );
     }
     if (!existsSync(vault.path)) {
-      throw new Error(
-        `E2: Invalid vault path: vault "${flags.vault}" points to non-existent path\n\n` +
+      throw new VaultError(
+        'E2',
+        `Invalid vault path: vault "${flags.vault}" points to non-existent path\n\n` +
         `Path: ${vault.path}\n` +
         `Tip: Vault may have been moved or deleted. ` +
         `Run 'clausidian vault unregister ${flags.vault}' to remove it.`
@@ -62,8 +65,9 @@ export function resolveVault(flags, registry, fallbackPath) {
   if (oaVault) {
     const absPath = resolve(oaVault);
     if (!existsSync(absPath)) {
-      throw new Error(
-        `E2: Invalid vault path from OA_VAULT environment variable\n\n` +
+      throw new VaultError(
+        'E2',
+        `Invalid vault path from OA_VAULT environment variable\n\n` +
         `Path: ${absPath}\n` +
         `Tip: Update OA_VAULT to point to an existing vault directory, ` +
         `or unset it to use registry default.`
@@ -80,8 +84,9 @@ export function resolveVault(flags, registry, fallbackPath) {
   const defaultVault = registry.getDefault();
   if (defaultVault) {
     if (!existsSync(defaultVault.path)) {
-      throw new Error(
-        `E2: Invalid vault path: default vault "${defaultVault.name}" points to non-existent path\n\n` +
+      throw new VaultError(
+        'E2',
+        `Invalid vault path: default vault "${defaultVault.name}" points to non-existent path\n\n` +
         `Path: ${defaultVault.path}\n` +
         `Tip: Registry default may be corrupted. ` +
         `Run 'clausidian vault list' to check status.`
@@ -111,8 +116,9 @@ export function resolveVault(flags, registry, fallbackPath) {
     '3. Set registry default: clausidian vault default <name>',
   ];
 
-  throw new Error(
-    `E3: No vault selected and no fallback available\n\n` +
+  throw new VaultError(
+    'E3',
+    `No vault selected and no fallback available\n\n` +
     (hasRegistry
       ? `Registered vaults: ${registry.list().map(v => v.name).join(', ')}\n\n`
       : `No vaults registered. Register one with: clausidian vault register <name> <path>\n\n`) +

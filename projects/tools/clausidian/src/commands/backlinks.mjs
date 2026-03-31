@@ -2,6 +2,7 @@
  * backlinks — show notes that link to a given note
  */
 import { Vault } from '../vault.mjs';
+import { formatTable } from '../table-formatter.mjs';
 
 export function backlinks(vaultRoot, noteName) {
   const vault = new Vault(vaultRoot);
@@ -18,11 +19,7 @@ export function backlinks(vaultRoot, noteName) {
   }
 
   console.log(`\n${results.length} note(s) link to [[${noteName}]]:\n`);
-  console.log('| File | Type | Summary |');
-  console.log('|------|------|---------|');
-  for (const r of results) {
-    console.log(`| [[${r.file}]] | ${r.type} | ${r.summary || '-'} |`);
-  }
+  console.log(formatTable(results, ['file', 'type', 'summary'], { wikilink: ['file'] }));
 
   return { results };
 }

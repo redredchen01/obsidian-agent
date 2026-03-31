@@ -1,10 +1,11 @@
 /**
  * Vault — core operations for reading/writing Obsidian notes
  */
-import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, openSync, readSync, closeSync } from 'fs';
 import { resolve, join, dirname } from 'path';
 import { spawnSync } from 'node:child_process';
 import { SimilarityEngine } from './similarity-engine.mjs';
+import { updateFrontmatter } from './frontmatter-helper.mjs';
 
 const DEFAULT_DIRS = ['areas', 'projects', 'resources', 'journal', 'ideas'];
 
@@ -49,6 +50,24 @@ export class Vault {
   read(...segments) {
     const p = this.path(...segments);
     return existsSync(p) ? readFileSync(p, 'utf8') : null;
+  }
+
+  /**
+   * Read only the frontmatter portion of a file (first ~4KB).
+   * Returns the full frontmatter string or empty string if none.
+   * Much faster than read() for large notes when body is not needed.
+   */
+  readFrontmatter(...segments) {
+    const p = this.path(...segments);
+    if (!existsSync(p)) return '';
+    const buf = Buffer.allocUnsafe(4096);
+    let fd;
+    try {
+      fd = openSync(p, 'r');
+      const bytes = readSync(fd, buf, 0, 4096, 0);
+      return buf.toString('utf8', 0, bytes);
+    } catch { return ''; }
+    finally { if (fd !== undefined) closeSync(fd); }
   }
 
   write(...args) {
@@ -114,7 +133,9 @@ export class Vault {
         continue;
       }
       if (!entry.name.endsWith('.md') || entry.name.startsWith('_')) continue;
-      const content = this.read(dir, entry.name);
+      const content = includeBody
+        ? this.read(dir, entry.name)
+        : this.readFrontmatter(dir, entry.name);
       if (!content) continue;
       const fm = this.parseFrontmatter(content);
       const note = {
@@ -129,6 +150,7 @@ export class Vault {
         related: Array.isArray(fm.related) ? fm.related : [],
         created: fm.created || '',
         updated: fm.updated || '',
+        pinned: fm.pinned === 'true' || fm.pinned === true,
       };
       if (includeBody) note.body = this.extractBody(content);
       notes.push(note);
@@ -216,13 +238,20 @@ export class Vault {
   // ── Find backlinks (notes that link TO a given note) ─
 
   backlinks(noteName) {
-    const notes = this.scanNotes({ includeBody: true });
+    // Use ripgrep to pre-filter files containing [[noteName]]
+    const rgFiles = this._rgPrefilter(`[[${noteName}]]`, false);
+    const notes = this.scanNotes();
     return notes.filter(n => {
       if (n.file === noteName) return false;
       if (n.related.includes(noteName)) return true;
-      const content = `${n.body || ''}`;
-      return content.includes(`[[${noteName}]]`);
-    }).map(({ body, ...rest }) => rest);
+      // Check rg results or fallback to body scan
+      if (rgFiles !== null) {
+        const filePath = this.path(n.subdir || n.dir, `${n.file}.md`);
+        if (!rgFiles.has(filePath)) return false;
+      }
+      const content = this.read(n.subdir || n.dir, `${n.file}.md`);
+      return (content || '').includes(`[[${noteName}]]`);
+    });
   }
 
   // ── Find orphan notes (no inbound links) ─────────────
@@ -245,13 +274,7 @@ export class Vault {
     const filePath = `${dir}/${filename}.md`;
     let content = this.read(filePath);
     if (!content) return null;
-    for (const [key, val] of Object.entries(updates)) {
-      const strVal = Array.isArray(val) ? `[${val.join(', ')}]` : `"${val}"`;
-      const regex = new RegExp(`^(${key}:)\\s*.*$`, 'm');
-      if (content.match(regex)) {
-        content = content.replace(regex, `$1 ${strVal}`);
-      }
-    }
+    content = updateFrontmatter(content, updates);
     this.write(filePath, content);
     return true;
   }

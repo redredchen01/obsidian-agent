@@ -61,3 +61,10 @@ export function getMonthRange(year, month) {
   const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
   return { start, end };
 }
+
+export function filterRecentNotes(notes, days) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  return notes.filter(n => n.updated >= cutoffStr);
+}

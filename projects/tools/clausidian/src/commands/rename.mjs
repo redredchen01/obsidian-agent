@@ -5,6 +5,8 @@ import { renameSync } from 'fs';
 import { Vault } from '../vault.mjs';
 import { IndexManager } from '../index-manager.mjs';
 import { todayStr } from '../dates.mjs';
+import { updateFrontmatter } from '../frontmatter-helper.mjs';
+import { NoteNotFoundError } from '../errors.mjs';
 
 export function rename(vaultRoot, noteName, newTitle) {
   const vault = new Vault(vaultRoot);
@@ -16,7 +18,7 @@ export function rename(vaultRoot, noteName, newTitle) {
 
   const note = vault.findNote(noteName);
   if (!note) {
-    throw new Error(`Note not found: ${noteName}`);
+    throw new NoteNotFoundError(noteName);
   }
 
   const newFile = newTitle.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-').replace(/(^-|-$)/g, '');
@@ -34,8 +36,7 @@ export function rename(vaultRoot, noteName, newTitle) {
 
   // Update title and filename in the note itself
   let content = vault.read(note.dir, `${note.file}.md`);
-  content = content.replace(/^(title:)\s*.*$/m, `$1 "${newTitle}"`);
-  content = content.replace(/^(updated:)\s*.*$/m, `$1 "${todayStr()}"`);
+  content = updateFrontmatter(content, { title: newTitle, updated: todayStr() });
   vault.write(note.dir, `${note.file}.md`, content);
 
   // Rename the file
@@ -56,7 +57,7 @@ export function rename(vaultRoot, noteName, newTitle) {
     if (!otherContent.includes(oldRef)) continue;
 
     otherContent = otherContent.replaceAll(oldRef, newRef);
-    otherContent = otherContent.replace(/^(updated:)\s*.*$/m, `$1 "${todayStr()}"`);
+    otherContent = updateFrontmatter(otherContent, { updated: todayStr() });
     vault.write(otherPath, otherContent);
     updated++;
   }

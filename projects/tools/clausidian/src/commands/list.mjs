@@ -2,6 +2,8 @@
  * list — list notes with filtering
  */
 import { Vault } from '../vault.mjs';
+import { filterRecentNotes } from '../dates.mjs';
+import { formatTable } from '../table-formatter.mjs';
 
 export function list(vaultRoot, { type, tag, status, recent } = {}) {
   const vault = new Vault(vaultRoot);
@@ -16,10 +18,7 @@ export function list(vaultRoot, { type, tag, status, recent } = {}) {
     notes = notes.filter(n => n.status !== 'archived');
   }
   if (recent) {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - recent);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
-    notes = notes.filter(n => n.updated >= cutoffStr);
+    notes = filterRecentNotes(notes, recent);
   }
 
   // Sort by updated desc
@@ -31,11 +30,7 @@ export function list(vaultRoot, { type, tag, status, recent } = {}) {
   }
 
   console.log(`\n${notes.length} note(s):\n`);
-  console.log('| File | Title | Type | Status | Summary | Updated |');
-  console.log('|------|-------|------|--------|---------|---------|');
-  for (const n of notes) {
-    console.log(`| [[${n.file}]] | ${n.title} | ${n.type} | ${n.status} | ${n.summary || '-'} | ${n.updated} |`);
-  }
+  console.log(formatTable(notes, ['file', 'title', 'type', 'status', 'summary', 'updated'], { wikilink: ['file'] }));
 
   // Stats
   const types = {};
