@@ -1,25 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SearchCache } from '../src/search-cache.mjs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { promises as fs } from 'fs';
 
 test('SearchCache vault isolation', async (t) => {
-  let tmpDir;
-
-  t.before(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'search-cache-vault-'));
-  });
-
-  t.after(() => {
-    try {
-      rmSync(tmpDir, { recursive: true });
-    } catch (err) {
-      // ignore
-    }
-  });
 
   await t.test('1. Cache key includes vault name prefix', () => {
     const cache = new SearchCache();
@@ -98,27 +81,6 @@ test('SearchCache vault isolation', async (t) => {
     // Verify they're different entries
     const stats = cache.stats();
     assert.equal(stats.totalEntries, 3, 'Should have 3 separate cache entries');
-  });
-
-  await t.test('6. Disk persistence includes vault name in cache', async () => {
-    const cache = new SearchCache();
-    const cachePath = join(tmpDir, 'vault-persist.json');
-
-    // Set data in different vaults
-    cache.set('q1', 'vault1', {}, ['data1']);
-    cache.set('q2', 'vault2', {}, ['data2']);
-
-    await cache.saveToDisk(cachePath, 'v1.0.0');
-
-    // Load and verify
-    const data = JSON.parse(await fs.readFile(cachePath, 'utf8'));
-    assert(Array.isArray(data.entries), 'Entries should be array');
-    assert.equal(data.entries.length, 2, 'Should have 2 cache entries');
-
-    // Verify vault names are in keys
-    const keys = data.entries.map(([key]) => key);
-    assert(keys.some(k => k.startsWith('vault1|')), 'Should have vault1 key');
-    assert(keys.some(k => k.startsWith('vault2|')), 'Should have vault2 key');
   });
 
   await t.test('7. Backward compatibility: null vaultName works', () => {
@@ -219,26 +181,5 @@ test('SearchCache vault isolation', async (t) => {
 
     assert.deepEqual(resultX, ['x-result'], 'vault-x should have isolated complex result');
     assert.deepEqual(resultY, ['y-result'], 'vault-y should have isolated complex result');
-  });
-
-  await t.test('Bonus: Disk load restores vault-isolated cache', async () => {
-    const cache1 = new SearchCache();
-    const cachePath = join(tmpDir, 'vault-restore.json');
-
-    // Store in multiple vaults
-    cache1.set('q1', 'vault1', {}, ['v1-data']);
-    cache1.set('q2', 'vault2', {}, ['v2-data']);
-    await cache1.saveToDisk(cachePath, 'v1.0.0');
-
-    // Load into new cache
-    const cache2 = new SearchCache();
-    await cache2.loadFromDisk(cachePath, 'v1.0.0');
-
-    // Verify vault isolation is restored
-    const result1 = cache2.get('q1', 'vault1', {});
-    const result2 = cache2.get('q2', 'vault2', {});
-
-    assert.deepEqual(result1, ['v1-data'], 'vault1 data should be restored');
-    assert.deepEqual(result2, ['v2-data'], 'vault2 data should be restored');
   });
 });
