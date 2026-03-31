@@ -23,16 +23,20 @@
 
 ### P4: VWRS (Video Watermark Removal System)
 - **Location**: `projects/production/video-watermark-removal-system/`
-- **Status**: 🔨 Phase 2 Complete - Tracking Layer (CSRT + Stabilization)
+- **Status**: 🔨 Phase 3 Complete - Temporal Reference Layer (OpticalFlow + Alignment)
 - **Stack**: Python, OpenCV, PyTorch-ready
-- **Architecture**: 4-layer pipeline (Tracking ✅ → TemporalRef → SpatialRestore → Integration)
+- **Architecture**: 4-layer pipeline (Tracking ✅ → TemporalRef ✅ → SpatialRestore → Integration)
 - **Phase 2 Deliverables**:
-  - Tracker (CSRT algorithm with drift detection)
-  - MaskStabilizer (temporal smoothing + edge feathering + morphological denoising)
-  - TrackingVisualizer (debug visualization for tracking results)
-  - 12+ unit tests (coverage ~85%), complete demo script, automated test suite
-  - Performance: 100 frames (480p) in ~4s total
-- **Next Phase**: Phase 3 - Temporal Reference Layer (OpticalFlow + Frame Alignment)
+  - Tracker (CSRT + drift detection)
+  - MaskStabilizer (temporal smoothing + feathering + denoising)
+  - 12+ unit tests (~85% coverage), 100 frames (480p) in ~4s
+- **Phase 3 Deliverables**:
+  - OpticalFlowEstimator (Farneback algorithm)
+  - FrameAligner (reverse flow warping + confidence)
+  - ReferenceFetcher (temporal window sampling + weighted fusion)
+  - 15+ unit tests (~80% coverage), 100 frames (480p) in ~10-12s
+  - Priority strategy: prefer pixels without watermark
+- **Next Phase**: Phase 4 - Spatial Restoration (Telea/NS inpainting)
 - **Last Update**: 2026-03-31
 
 ## Experimental Projects
@@ -86,19 +90,30 @@ kb  # cd to obsidian/
 - [x] Automated test suite (test_phase2.sh)
 - [x] Phase 2 completion report
 
-### VWRS Phase 3 (Next)
-- [ ] OpticalFlowEstimator (Farneback)
-- [ ] FrameAligner (frame warping + confidence)
-- [ ] ReferenceFetcher (temporal window sampling + weighted fusion)
-- [ ] Unit tests for temporal ref layer
+### VWRS Phase 3 ✅
+- [x] OpticalFlowEstimator (Farneback algorithm)
+- [x] FrameAligner (reverse flow warping + confidence)
+- [x] ReferenceFetcher (temporal window sampling + weighted fusion)
+- [x] 15+ unit tests (~80% coverage)
+- [x] Complete demo script (optical flow + alignment + reference extraction)
+- [x] Automated test suite (test_phase3.sh)
+- [x] Phase 3 completion report
+
+### VWRS Phase 4 (Next)
+- [ ] SpatialRestorer enhancement
+  - [ ] Telea inpainting backend
+  - [ ] NS (Navier-Stokes) inpainting backend
+  - [ ] Swappable backend architecture
+- [ ] Reference-guided restoration
+- [ ] Unit tests for spatial restoration
 - [ ] Demo script + visualization
 
-### VWRS Phase 4-6
-- [ ] Spatial restoration (inpainting backends: Telea/NS/optional LaMa)
+### VWRS Phase 5-6
 - [ ] Integration layer (boundary blending, temporal filtering, grain matching)
-- [ ] Performance optimization + batch processing
-- [ ] Full test coverage + E2E testing
-- [ ] CLI completion + documentation
+- [ ] Performance optimization + GPU acceleration
+- [ ] Batch processing + CLI completion
+- [ ] Full E2E testing + documentation
+- [ ] Optional: deep learning backends (LaMa/ZITS)
 
 ---
 
