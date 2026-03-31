@@ -362,12 +362,13 @@ blur_ksize: int = 51                      # gaussian blur 核大小
 
 ## System-Wide Impact
 
-- **Interaction graph:** `VideoPipeline` 內部 phase 之間透過 `masks` list 通信，text-cover mode 只替換 mask 來源，不接觸 `tracking.py` / `temporal_ref.py` / `integration.py`
-- **Error propagation:** OCR 後端載入失敗應在 `_detect_text_regions()` 即拋出，不延遲到 frame 處理中途；mask 格式錯誤應在 `_load_or_generate_masks()` 返回後做 shape assertion
-- **State lifecycle risks:** `PaddleOCR` / `EasyOCR` 模型對象應在 `TextDetector.__init__` 懶加載，不持久化跨請求（API context），每次 job 創建新實例
-- **API surface parity:** `PipelineParams` 的 `pipeline_mode` pattern 必須與 `PipelineConfig.pipeline_mode` 允許值保持同步（deferred 到 implementation，建議用共用 literal constant）
-- **Integration coverage:** Unit 4 的 integration test 需驗證 text-cover → 遮蓋輸出的端到端 frame diff（而非僅驗證 pipeline 不 crash）
-- **Unchanged invariants:** 現有 `pipeline_mode="watermark"` 路徑、所有 `PipelineConfig` 欄位預設值、`pipeline_bridge.params_to_config()` 的現有參數映射均不改動
+- **Interaction graph:** text-cover mode 繞過 `_track_and_stabilize()` 和 `_fetch_temporal_references()`（僅 gaussian_blur / solid），直接進 `_apply_cover()`；lama strategy 仍需 `_apply_cover()` 中自行 loop 呼叫 `LamaRestorer.restore_single()`。`integration.py` 的 boundary blending 和 temporal refining 仍執行（保留輸出穩定性）
+- **Celery task gap（已知）：** `src/tasks/video.py:process_video` task signature 目前是 stub（模擬 300 幀），不呼叫 `VideoPipeline`；新參數 `pipeline_mode` 等未反映在 task 層。本計劃範圍是 API + worker processor path（`api/worker/processor.py` 走 `VideoPipeline`），Celery task 路徑不在範圍內，但需在 Scope Boundaries 標記為後續同步需求
+- **Error propagation:** OCR 後端載入失敗在 `_detect_text_regions()` 即 fail fast；`detect_interval=0` 需在 `TextDetectionSampler` 入口驗證（dataclass 不做 validation）
+- **State lifecycle risks:** `PaddleOCR` / `EasyOCR` 模型懶加載，每次 job 新建實例；`api/worker/processor.py` `max_concurrent=2` 情境下，兩個並發 text-cover job 各自持有一份 OCR 模型 + 完整 frames list，peak memory 較現有模式高，需在 README 標注
+- **API surface parity:** `PipelineParams.pipeline_mode` pattern 必須與 `PipelineConfig` 允許值同步（建議共用 literal constant）
+- **Integration coverage:** Unit 4 integration test 需驗證 text-cover → 遮蓋輸出的端到端 frame diff（mask 區域像素被改變，非 mask 區域不變）
+- **Unchanged invariants:** 現有 `pipeline_mode="watermark"` 路徑、所有 `PipelineConfig` 欄位預設值、`pipeline_bridge.params_to_config()` 現有映射均不改動
 
 ## Risks & Dependencies
 
