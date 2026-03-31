@@ -12,6 +12,8 @@
 
 ## Pending
 
+- [x] 2026-03-31 | P1 | /vault-search-cli | Obsidian 全文搜索 API — 給腳本查詢 vault 內容、歷史記錄、決策追蹤 | built: 2026-03-31
+- [x] 2026-03-31 | P1 | /vault-watch | Real-time vault file watcher — 整合到開發流程，偵測變更自動觸發 | built: 2026-03-31
 - [x] 2026-03-31 | P1 | /linear-slack-reporter-skill | 自動查詢 Linear bug，格式化為 Slack 表格，一鍵發送通知 | built: 2026-03-31
 - [x] 2026-03-31 | P1 | /dspy-optimizer | DSPy 自動 prompt 優化 — Obsidian tag 匹配精度 + A/B 測試框架 | built: 2026-03-31
 - [x] 2026-03-31 | P1 | /agent-tracer | 輕量級 Agent 追蹤系統：append-only JSONL + 周報聚合 | built: 2026-03-31
@@ -48,3 +50,12 @@
 
 - [x] 2026-03-31 | P1 | /prompt-ab-test | Prompt A/B 測試框架 — 自動比較不同 prompt 效果 + 版本控制 | built: 2026-03-31
 - [x] 2026-03-31 | P1 | /journal-auto-log | Obsidian journal 自動同步 — 將操作記錄自動寫回 journal，形成閉環 | built: 2026-03-31
+
+---
+
+## 近期 (Next Round)
+
+### P2 — Build Next
+
+- [x] 2026-03-31 | P2 | /context-compact | 上下文壓縮器 — 自動檢測大型 codebase，壓縮冗長上下文到 200K | built: 2026-03-31
+- [x] 2026-03-31 | P2 | /tg-task-runner | TG Bot 遠端任務觸發 — /run <task> 遠端執行 launchd 排程任務 | built: 2026-03-31

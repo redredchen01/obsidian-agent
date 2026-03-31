@@ -1,7 +1,7 @@
 ---
 title: "feat: Dynamic Text Watermark Removal + New Watermark Overlay Tool"
 type: feat
-status: active
+status: completed
 date: 2026-03-31
 ---
 
@@ -31,7 +31,7 @@ date: 2026-03-31
 
 **核心偵測與去除**
 - R1. 使用者只需提供輸入影片即可自動偵測並去除文字水印（零 ROI 前置操作）
-- R2. MVP 偵測後端固定為 EasyOCR（CPU/GPU 均可）；PaddleOCR 預留後端抽象，v2 實作
+- R2. MVP 偵測後端固定為 EasyOCR（CPU/GPU 均可）；v2 若有需要再加入 PaddleOCR（不在 MVP 預建抽象層）
 - R3. 去除策略可選（gaussian_blur / solid / delogo），滿足不同品質需求
 
 **新水印與輸出**
@@ -51,8 +51,8 @@ date: 2026-03-31
 - **不包含** 批次多影片並行處理（MVP 只處理單支 mp4）
 - **不包含** 訓練或微調 OCR 模型
 - **不包含** SAM2 精確多邊形 mask
-- **MVP 輸入限制**：建議 ≤ 10 分鐘、≤ 1080p；全幀載入 RAM，超過限制需分段處理（v2）
-- **MVP 輸出不保留音訊**：cv2.VideoWriter 不支援音軌；需音訊時使用 `ffmpeg_utils.mux_audio` 後處理（文件說明）
+- **MVP 輸入限制**：建議 ≤ 10 分鐘、≤ 1080p；全幀載入 RAM，超過限制需分段處理（v2）。Stage A `read_frames` 執行前做 pre-flight 檢查：`frame_count × width × height × 3 bytes`，超過 4GB 拒絕執行並提示使用 `start_sec/end_sec` 分段
+- **MVP 音訊保留**：Stage F ffmpeg 指令加 `-c:a copy`，零成本保留原始音軌；若來源無音訊 ffmpeg 靜默忽略，不報錯
 - **包含（MVP）** ffmpeg delogo 作為靜態位置快捷：`--cover-strategy delogo` 走 subprocess，不走 frame-by-frame Python 路徑
 
 ## Context & Research
@@ -86,7 +86,7 @@ date: 2026-03-31
 - **Stage-based pipeline，非 class hierarchy**：每個 Stage 是獨立 callable module，`run_pipeline.py` 依序調用。理由：降低耦合，任一 stage 可單獨替換或跳過，調試時直接跑單 stage
 - **EasyOCR 作為 MVP 唯一後端**：無 PaddlePaddle 依賴，CPU 可用，四點 bbox 格式穩定。Unit 3 不預建 ABC；PaddleOCR 在 v2 有需要時才 extract interface
 - **偵測採樣，插值由 Stage C 負責**：Stage B 只偵測關鍵幀（每 `detect_interval=10` 幀），非關鍵幀填 `None`。所有跨幀補間與平滑統一由 Stage C WatermarkTracker 負責，避免 Stage B 做不完整的插值邏輯
-- **IoU + 中心距離雙重匹配做追蹤**：避免單純 IoU 在小 bbox 時失效，相鄰幀 bbox 匹配後做 EMA（指數加權平均）平滑，消除抖動
+- **combined cost 匹配做追蹤**：`cost = (1 - IoU) + center_dist / center_dist_threshold`，cost < `match_cost_threshold` 則配對。避免 OR 邏輯將空間上不相關的 bbox 錯誤合併到同一 track。EMA 平滑後加 step-change detector：相鄰幀中心距 > `step_threshold` 時重置 EMA，防止水印位置跳變時出現拖影
 - **去除優先 gaussian_blur**：100x 快於 inpainting，對「合規遮蓋」場景已足夠；delogo 作為 CLI-only 靜態快捷；lama 作為未來選項預留介面
 - **Stage F 為 file-based subprocess**：Stage E 完成後 VideoWriter 寫出 `<output_stem>_cleaned_tmp.mp4`，Stage F ffmpeg subprocess 讀取此暫存檔疊加水印輸出最終 mp4，暫存檔由 pipeline 結束後清理。架構圖中 Stage F 不回傳 `final_frames`，而是直接寫出 `output.mp4`。ffmpeg 最終輸出指定 `-c:v libx264 -preset fast -crf 23` 確保播放器相容性
 - **Config 以 Pydantic + YAML 雙層驗證**：YAML 加載後透過 Pydantic model 驗證，提供有意義的錯誤訊息，而不是 KeyError 在運行時爆炸
@@ -178,7 +178,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 0: EasyOCR PoC Validation（Blocking Gate）**
+- [x] **Unit 0: EasyOCR PoC Validation（Blocking Gate）**
 
 **Goal:** 在投入 10 個 unit 之前，驗證 EasyOCR 在目標水印類型上的實際 detection rate，確保核心假設成立
 
@@ -193,10 +193,13 @@ graph TB
 - 收集 3-5 個代表性目標影片片段（含不同透明度、不同背景複雜度的浮水印）
 - 對每個片段提取 10-20 個代表幀，跑 `easyocr.Reader(["ch_sim", "en"]).readtext(frame)`
 - 記錄：detection rate（有偵測到水印的幀佔比）、confidence 分布、bbox 位置準確性
-- **Gate：detection rate ≥ 70%** → 繼續 Unit 1-10；否則選擇以下 fallback 之一並更新計劃：
-  - (A) Unit 3 前加 CLAHE 預處理（`cv2.createCLAHE().apply(frame_gray)`）
-  - (B) 降低 R1，允許可選的 `hint_bbox` config 欄位（使用者提供水印位置範圍）
-  - (C) 改用 frame difference 偵測（不依賴 OCR 識字能力）
+- **Gate：detection rate ≥ 70%** — 分母定義：每個測試幀有「人工標記水印存在」的真值（ground truth），偵測成功 = EasyOCR 返回至少一個 bbox 與水印區域 IoU ≥ 0.3
+  - 通過（≥70%）→ 繼續 Unit 1-10
+  - 未通過（<70%）→ **依序嘗試 fallback**，每個 fallback 後重新量測：
+    - (A) Unit 3 前加 CLAHE 預處理（`cv2.createCLAHE().apply(frame_gray)`）
+    - (B) 降低 R1，允許可選的 `hint_bbox` config 欄位（使用者提供水印位置範圍）
+    - (C) 改用 frame difference 偵測（不依賴 OCR 識字能力）
+  - **若 A/B/C 全部嘗試後 detection rate 仍 <70%**：硬中止計劃，更新 Problem Frame 說明限制，不繼續 Unit 1-10。此為 hard abort — 不在失敗的核心假設上繼續投入
 
 **Patterns to follow:**
 - 簡單腳本，不需框架，100 行內完成
@@ -210,7 +213,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 1: Project Scaffold + Config Schema**
+- [x] **Unit 1: Project Scaffold + Config Schema**
 
 **Goal:** 建立專案目錄結構、依賴管理、YAML config schema（Pydantic model）
 
@@ -229,7 +232,7 @@ graph TB
 - `src/config.py` 定義 `PipelineConfig` Pydantic v2 model，包含所有子 section：
   - `InputConfig(path, start_sec, end_sec)`
   - `DetectionConfig(backend, detect_interval, bbox_padding, confidence_threshold, min_area, edge_region_only)`
-  - `TrackingConfig(iou_threshold, center_dist_threshold, ema_alpha, gap_tolerance)`
+  - `TrackingConfig(center_dist_threshold, match_cost_threshold, ema_alpha, step_threshold, gap_tolerance)`
   - `MaskConfig(expand_px, feather_radius)`
   - `RemoveConfig(strategy, blur_ksize, solid_color, delogo_band)`
   - `WatermarkConfig(enabled, type, text, image_path, position, opacity, scale, margin, start_sec, end_sec)`
@@ -254,7 +257,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 2: Stage A — Video Reader / Writer + FFmpeg Utils**
+- [x] **Unit 2: Stage A — Video Reader / Writer + FFmpeg Utils**
 
 **Goal:** 實作影片讀取（metadata + frame extraction）、影片寫入、以及 ffmpeg subprocess 工具函數
 
@@ -272,7 +275,7 @@ graph TB
 - `VideoReader`：
   - `read_metadata(path) -> VideoMeta` — namedtuple: fps, width, height, frame_count, duration_sec
   - `iter_frames(path) -> Generator[np.ndarray, None, None]` — `cv2.VideoCapture` 逐幀 yield BGR frame
-  - `read_frames(path, start_sec, end_sec) -> List[np.ndarray]` — 讀取指定時間段
+  - `read_frames(path, start_sec, end_sec) -> List[np.ndarray]` — 讀取指定時間段，執行前 pre-flight RAM 估算：`meta.frame_count × meta.width × meta.height × 3`，若超過 4GB 拋 `MemoryError` 並提示使用 `start_sec/end_sec` 分段
 - `VideoWriter`：
   - `write_frames(frames, path, fps, fourcc="mp4v")` — `cv2.VideoWriter` 寫出
   - 支援 `mp4v` (mp4)，不預設其他 codec
@@ -300,7 +303,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 3: Stage B — EasyOCRDetector + TextDetectionSampler + CandidateFilter**
+- [x] **Unit 3: Stage B — EasyOCRDetector + TextDetectionSampler + CandidateFilter**
 
 **Goal:** 實作 EasyOCR 偵測器（無 ABC），採樣關鍵幀，過濾候選 bbox；不做跨幀插值（插值由 Stage C 負責）
 
@@ -349,7 +352,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 4: Stage C — WatermarkTracker + TemporalSmoother**
+- [x] **Unit 4: Stage C — WatermarkTracker + TemporalSmoother**
 
 **Goal:** 將逐幀 BBox dict 串成穩定軌跡，並對軌跡做 EMA 平滑消除抖動
 
@@ -366,13 +369,14 @@ graph TB
 - `Track` dataclass：`track_id: int`, `bboxes: Dict[int, BBox | None]`（frame_idx → bbox，漏偵測時為 None），`start_frame: int`, `end_frame: int`
 - `WatermarkTracker`：
   - `track(detections: Dict[int, List[BBox]], total_frames: int) -> List[Track]`
-  - 相鄰幀匹配：IoU > `iou_threshold` **或** 中心距離 < `center_dist_threshold`（兩者取 OR）
-  - 漏偵測補償：連續 <= `gap_tolerance` 幀漏偵測時，bbox 用線性插值補全（而非終止 track）
-  - 每個 detection 僅分配給一條 track（貪婪匹配，按 IoU 降序）
+  - 相鄰幀匹配：使用組合 cost = `(1 - IoU) + center_dist / center_dist_threshold`，cost 小於 `match_cost_threshold`（預設 1.5）則認為同一 track；避免 OR 邏輯導致空間上相距甚遠的 bbox 被錯誤合併
+  - 漏偵測補償：連續 <= `gap_tolerance` 幀漏偵測時，bbox 用線性插值補全（而非終止 track）；gap-fill 後所有 active frame（start_frame ≤ i ≤ end_frame）的 `bboxes[i]` 保證為 BBox，不為 None；gap-fill 前為 None 的 slots 在 TemporalSmoother 中特判跳過
+  - 每個 detection 僅分配給一條 track（貪婪匹配，按 cost 升序）
 - `TemporalSmoother`：
   - `smooth(tracks: List[Track], alpha: float) -> List[Track]`
   - 對每條 track 的 bbox 序列（x,y,w,h 各維度）做 EMA：`smooth_val = alpha * curr + (1-alpha) * prev`
   - `alpha` 越小越平滑（越滯後），越大越即時（越抖）
+  - **Step-change detector**：若相鄰幀的 bbox 中心距離 > `step_threshold`（預設 50px），跳過 EMA 直接採用新值，避免 EMA lag 在水印位置跳變時產生拖影；`step_threshold` 可在 `TrackingConfig` 中配置
 
 **Patterns to follow:**
 - IoU helper：`iou(a: BBox, b: BBox) -> float`
@@ -391,7 +395,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 5: Stage D — MaskBuilder + MaskRender**
+- [x] **Unit 5: Stage D — MaskBuilder + MaskRender**
 
 **Goal:** 從 Track list 生成每幀的 mask ndarray，支援 bbox 擴張與 feather；支援 debug overlay 輸出
 
@@ -407,7 +411,7 @@ graph TB
 **Approach:**
 - `MaskBuilder`：
   - `build(tracks: List[Track], frame_h, frame_w, total_frames, cfg: MaskConfig) -> List[np.ndarray]`
-  - 返回 `List[np.ndarray]` shape `(H, W)` uint8，0=background，255=mask 區域
+  - 返回 `List[np.ndarray]` shape `(H, W)` uint8，語意：`feather_radius=0` 時為二值 0/255；`feather_radius>0` 時為 0-255 漸層（0=背景，255=完全遮蓋，中間值=軟邊過渡）；下游 Remover 統一使用 alpha blend 處理，不假設二值輸入
   - 對每幀合併所有活躍 track 的 bbox，繪製矩形 mask
   - `expand_px`：bbox 四邊各擴張 n 個像素，clamp 到 frame 邊界
   - `feather_radius > 0`：`cv2.GaussianBlur(mask, (kr,kr), feather_radius)` 做軟邊，kr 為奇數
@@ -430,7 +434,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 6: Stage E — Removers（Blur / Solid / Delogo）**
+- [x] **Unit 6: Stage E — Removers（Blur / Solid / Delogo）**
 
 **Goal:** 實作三種去除策略，依據 mask 遮蓋舊浮水印
 
@@ -456,7 +460,8 @@ graph TB
   - `remove(frame, mask) -> np.ndarray`
 - `DelogoRemover`（獨立 class，不處理 frame）：
   - `apply(input_path, output_path, static_box: BBox)` — subprocess ffmpeg delogo
-  - 僅適用靜態位置（CLI 快捷路徑），不用在 frame-by-frame pipeline 中
+  - **⚠️ 僅適用靜態位置水印**（CLI 快捷路徑）；若水印位置隨幀移動，此路徑無效。CLI 使用時工具應輸出 WARNING："delogo strategy requires a fixed watermark position; use blur/solid for dynamic watermarks"
+  - 不在 frame-by-frame pipeline 中使用
 - 策略選擇：`run_pipeline.py` 直接 if/elif 實例化對應 class；v2 有第三種策略時再 extract ABC
 - `remove_sequence(frames, masks, remover) -> List[np.ndarray]` — batch apply，定義在 `run_pipeline.py`
 
@@ -473,7 +478,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 7: Stage F — New Watermark Overlay**
+- [x] **Unit 7: Stage F — New Watermark Overlay**
 
 **Goal:** 在清理後的幀序列上疊加使用者自訂浮水印（文字 or PNG）
 
@@ -488,8 +493,8 @@ graph TB
 
 **Approach:**
 - Stage F 為 file-based pipeline：`run_pipeline.py` 在 Stage E 後呼叫 `VideoWriter.write_frames` 寫出 `<output_stem>_cleaned_tmp.mp4`，Stage F 讀取此暫存檔疊加水印
-  - `text_watermark.py`：`apply(input_path, output_path, cfg: WatermarkConfig)` → 調用 `ffmpeg_utils.add_watermark_text`；ffmpeg 參數加 `-c:v libx264 -preset fast -crf 23` 確保播放器相容
-  - `image_watermark.py`：`apply(input_path, output_path, cfg: WatermarkConfig)` → 調用 `ffmpeg_utils.add_watermark_image`；同上 libx264 參數
+  - `text_watermark.py`：`apply(input_path, output_path, cfg: WatermarkConfig)` → 調用 `ffmpeg_utils.add_watermark_text`；ffmpeg 參數：`-c:v libx264 -preset fast -crf 23 -c:a copy`（`-c:a copy` 零成本保留音訊，若來源無音訊 ffmpeg 靜默忽略）
+  - `image_watermark.py`：`apply(input_path, output_path, cfg: WatermarkConfig)` → 調用 `ffmpeg_utils.add_watermark_image`；同上 libx264 + `-c:a copy` 參數
   - 暫存檔生命週期：Stage F 執行完成後，`run_pipeline.py` 統一清理 `_cleaned_tmp.mp4`（`os.remove`），不論成功或異常（try/finally）
 - `WatermarkConfig` 欄位對應：
   - `position`：`"top-left" | "top-right" | "bottom-left" | "bottom-right" | "center"`
@@ -502,7 +507,7 @@ graph TB
 - Happy path: `WatermarkConfig(type="text", text="TEST", position="bottom-right")` → `text_watermark.apply` 呼叫 ffmpeg 不報錯，輸出文件存在
 - Happy path: ffmpeg drawtext 命令字串組裝正確（單元測試直接驗證命令字串，不需跑 ffmpeg）
 - Error path: `WatermarkConfig(type="image", image_path="not_exists.png")` → ffmpeg 返回非零 exitcode → `RuntimeError`
-- Edge case: `WatermarkConfig(enabled=False)` → `apply` 直接複製 input 到 output，不呼叫 ffmpeg
+- Edge case: `WatermarkConfig(enabled=False)` → Stage F 仍呼叫 ffmpeg（以 `-c:v libx264 -c:a copy` passthrough 重新封裝保留音訊），但不加任何 overlay filter
 
 **Verification:**
 - `pytest tests/test_watermark.py` 全部通過
@@ -510,7 +515,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 8: Pipeline Orchestrator**
+- [x] **Unit 8: Pipeline Orchestrator**
 
 **Goal:** 將 Stage A-F 串接成完整 pipeline，支援 `--only-*` 分段執行
 
@@ -527,14 +532,15 @@ graph TB
 - `PipelineMode` enum：`FULL | ONLY_DETECT | ONLY_MASK | ONLY_REMOVE`
 - 執行流程：
   1. Load frames（Stage A）
-  2. Stage B：若 `debug_dir/detections.json` 存在則載入 cache，跳過 EasyOCR；否則跑偵測後序列化到 JSON
+  2. Stage B：cache 驗證策略 — 讀取 `debug_dir/detections_manifest.json`（格式：`{input_path, input_mtime, config_hash}`），若 manifest 存在且三項均與當前一致，載入 `debug_dir/detections.json` 跳過 EasyOCR；否則重新偵測並更新 manifest + detections.json。`config_hash = sha256(json.dumps(cfg.detection.model_dump(), sort_keys=True))[:8]`
+     - **BBox JSON schema**：`detections.json` 格式為 `{"frame_idx_str": [[x, y, w, h, conf], ...]}`，key 為字串（JSON 限制），value 為 BBox 欄位的 float list；載入時轉回 `Dict[int, List[BBox]]`
      - 偵測完成後 stdout：`"Stage B: detected in N/{total} key frames (K tracks expected)"`
      - 若 N == 0：`WARNING: Stage B detected 0 frames. Check confidence_threshold or use hint_bbox.`
   3. `ONLY_DETECT` → 輸出 debug detection video，return
   4. `ONLY_MASK` → 跑 C+D，輸出 debug mask video，return（Stage B 結果從 cache 或本次偵測取得）
-  5. `ONLY_REMOVE` → 跑 C+D+E，輸出 cleaned video，return
+  5. `ONLY_REMOVE` → 跑 C+D+E，呼叫 `VideoWriter.write_frames` 直接寫出至 `--output` 指定路徑（不經 Stage F ffmpeg），return
   6. `FULL` → 跑 C+D+E → `VideoWriter` 寫出 `_cleaned_tmp.mp4` → Stage F ffmpeg subprocess 疊加水印輸出 `output.mp4` → try/finally 清理暫存檔
-- Stage 間透過 Python 函數調用，不透過磁碟 I/O 傳遞中間幀（debug 輸出是額外的 side effect）
+- Stage A→E 間透過 Python 函數調用，不透過磁碟 I/O 傳遞中間幀（debug 輸出是額外的 side effect）；**例外：Stage F（ffmpeg subprocess）透過 `_cleaned_tmp.mp4` 暫存檔與 Stage E 銜接，此為 file-based 邊界**
 - 進度輸出：`tqdm` 包裝 frame loop，顯示每 Stage 進度
 
 **Test scenarios:**
@@ -549,7 +555,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 9: Debug Exports**
+- [x] **Unit 9: Debug Exports**
 
 **Goal:** 實作各 Stage 的可視化 debug 輸出模組
 
@@ -579,7 +585,7 @@ graph TB
 
 ---
 
-- [ ] **Unit 10: CLI Entrypoint**
+- [x] **Unit 10: CLI Entrypoint**
 
 **Goal:** 實作 `python -m src.app` CLI，支援所有指定 flag
 
@@ -625,7 +631,7 @@ argparse 定義：
 - **Error propagation:** 每個 Stage 的 RuntimeError / FileNotFoundError 應允許向上傳播到 `run_pipeline`，統一在最外層 catch 並輸出友好錯誤訊息後 exit(1)
 - **State lifecycle risks:** EasyOCR Reader 為進程內單例（懶加載後複用），不跨 pipeline run 共享；`VideoCapture` 在 `read_frames` 完成後立即 `release()`
 - **API surface parity:** 本工具無 REST API，所有操作透過 CLI。未來若要加 API，`run_pipeline` 設計為 pure function，方便包裝
-- **Detection cache:** Stage B 結果序列化至 `debug/detections.json`；`ONLY_MASK` / `ONLY_REMOVE` 模式優先載入 cache，跳過 EasyOCR 重跑。cache 存在時 Stage B 執行時間從數分鐘降至 <1 秒
+- **Detection cache:** Stage B 結果序列化至 `debug/detections.json`（BBox 格式：`{frame_str: [[x,y,w,h,conf], ...]}` ）；`ONLY_MASK` / `ONLY_REMOVE` 模式優先載入 cache，跳過 EasyOCR 重跑。cache 命中條件：`debug/detections_manifest.json` 中的 `input_path + input_mtime + config_hash` 與當前一致。任一不符則 invalidate 並重建，防止舊 cache 污染不同輸入或不同偵測設定的 pipeline 執行
 - **Integration coverage:** Unit 8 的 e2e test 是唯一驗證完整 A→F 鏈路的測試；各 Stage 的 unit test 用合成數據，不需實際影片文件
 - **Unchanged invariants:** configs/demo.yaml 是使用者調試的入口，任何 schema 變更必須向後相容或更新 demo.yaml
 
