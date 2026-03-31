@@ -27,3 +27,9 @@
 - [x] 2026-03-30 | P2 | /launchd-health | 列出 24 個 LaunchAgent 狀態+失敗告警 | built: 2026-03-30
 - [x] 2026-03-31 | P1 | /linear-slack-reporter | 自動查詢 Linear bug、整理成表格、發 Slack 通知 | linear-slack-bug-reporter | built: 2026-03-31
 
+- [ ] 2026-03-31 | P1 | /auto-daily | 自動從 git+Obsidian+gwx+GA4 生成 daily-context.json | auto-daily-context
+- [ ] 2026-03-31 | P1 | /dspy-trial | DSPy 自動 prompt 優化 — Obsidian tag 匹配精度 | dspy-trial-plan
+- [ ] 2026-03-31 | P1 | /dashboard-roi-logger | 記錄 dashboard 使用頻率，驗證 Phase 9C/D ROI | dashboard-value-validation
+- [ ] 2026-03-31 | P2 | /ops-recommender | AI 推薦引擎：基於歷史告警模式推薦行動 | ops-system-upgrade-roadmap
+- [ ] 2026-03-31 | P2 | /alert-dedupe | 告警去重和自動升級邏輯 | ops-system-upgrade-roadmap
+- [ ] 2026-03-31 | P2 | /xhs-healthcheck | xhs 集成故障根因分析 (392 連續失敗) | dex-bot
