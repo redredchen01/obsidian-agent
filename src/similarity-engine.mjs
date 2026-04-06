@@ -5,7 +5,7 @@
  * logic that was previously duplicated across index-manager, link, and vault.
  */
 
-import { buildTagIDF, extractKeywords, calculateKeywordOverlap } from './scoring.mjs';
+import { buildTagIDF, buildDocIDF, buildDocVector, cosineSimilarity } from './scoring.mjs';
 
 export class SimilarityEngine {
   constructor(vault, options = {}) {
@@ -14,9 +14,13 @@ export class SimilarityEngine {
     this.minScore = options.minScore ?? 1.5;
     this.maxResults = options.maxResults ?? 25;
 
-    // Cache for TF-IDF weights
+    // Cache for tag TF-IDF weights
     this.tfidfCache = null;
     this.tfidfVersion = null;
+
+    // Cache for document TF-IDF vectors
+    this.docVectorCache = null;
+    this.docVectorVersion = null;
   }
 
   /**
@@ -32,6 +36,27 @@ export class SimilarityEngine {
     this.tfidfCache = buildTagIDF(notes, 'journal');
     this.tfidfVersion = version;
     return this.tfidfCache;
+  }
+
+  /**
+   * Get or build document TF-IDF vectors (cached)
+   * Cache key includes body length to detect content changes
+   */
+  getDocVectors(notes) {
+    const version = notes.map(n => `${n.file}:${(n.body || '').length}:${n.title}`).join('|');
+    if (this.docVectorVersion === version) {
+      return this.docVectorCache;
+    }
+
+    const idf = buildDocIDF(notes);
+    const vectors = new Map();
+    for (const n of notes) {
+      vectors.set(n.file, buildDocVector(n, idf));
+    }
+
+    this.docVectorCache = vectors;
+    this.docVectorVersion = version;
+    return vectors;
   }
 
   /**
@@ -55,14 +80,8 @@ export class SimilarityEngine {
     // Get TF-IDF weights (cached)
     const tagIDF = this.getTFIDF(notes);
 
-    // Build keyword sets per note (with optional body limit)
-    const noteKeywords = new Map();
-    for (const n of nonJournal) {
-      const bodyText = this.includeBody ? (n.body || '') : (n.body || '').slice(0, 500);
-      const text = `${n.title} ${n.summary} ${bodyText}`;
-      const words = extractKeywords(text);
-      noteKeywords.set(n.file, words);
-    }
+    // Build document TF-IDF vectors (cached)
+    const docVectors = this.getDocVectors(notes);
 
     // Track existing links (bidirectional)
     const existingLinks = new Set();
@@ -121,8 +140,12 @@ export class SimilarityEngine {
         }
       }
 
-      // Keyword co-occurrence bonus (capped at +2)
-      score += calculateKeywordOverlap(noteKeywords.get(a.file), noteKeywords.get(b.file));
+      // TF-IDF cosine similarity on document content (scale ×3, max +3)
+      const sim = cosineSimilarity(
+        docVectors.get(a.file) || {},
+        docVectors.get(b.file) || {},
+      );
+      score += sim * 3;
 
       // Filter: at least 1 shared tag AND score >= threshold
       if (shared.length >= 1 && score >= this.minScore) {
@@ -154,9 +177,15 @@ export class SimilarityEngine {
     const notes = this.vault.scanNotes({ includeBody: true });
     const nonJournal = notes.filter(n => n.type !== 'journal');
 
-    // Get TF-IDF weights
+    // Get tag TF-IDF weights and document vectors
     const tagIDF = this.getTFIDF(notes);
+    const docVectors = this.getDocVectors(notes);
     const titleWords = title.toLowerCase().split(/[\s-]+/).filter(w => w.length > 2);
+
+    // Build a query vector from the title for cosine comparison
+    const queryNote = { title, summary: '', body: tags.join(' ') };
+    const queryIDF = buildDocIDF([queryNote, ...notes]);
+    const queryVec = buildDocVector(queryNote, queryIDF);
 
     const results = nonJournal.map(n => {
       let score = 0;
@@ -173,6 +202,10 @@ export class SimilarityEngine {
       for (const t of tags) {
         if (n.tags.includes(t)) score += tagIDF[t] || 2;
       }
+
+      // Cosine similarity on document content (scale ×2)
+      const sim = cosineSimilarity(queryVec, docVectors.get(n.file) || {});
+      score += sim * 2;
 
       const { body, ...rest } = n;
       return { ...rest, score: Math.round(score * 10) / 10 };

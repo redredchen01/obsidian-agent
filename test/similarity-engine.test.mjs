@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { Vault } from '../src/vault.mjs';
 import { SimilarityEngine } from '../src/similarity-engine.mjs';
+import { buildDocIDF, buildDocVector, cosineSimilarity, tokenizeDoc } from '../src/scoring.mjs';
 
 // Mock notes for testing
 const mockNotes = [
@@ -181,5 +182,134 @@ describe('SimilarityEngine', () => {
     // Incremental should have fewer pairs (only those involving note-a)
     assert.ok(incrPairs.length <= allPairs.length, 'Incremental should have same or fewer pairs');
     assert.ok(incrPairs.every(p => p.a === 'note-a' || p.b === 'note-a'), 'All pairs should involve note-a');
+  });
+
+  it('should cache document vectors', () => {
+    const vault = { scanNotes: () => mockNotes };
+    const engine = new SimilarityEngine(vault, { minScore: 0.2 });
+
+    engine.scorePairs(mockNotes);
+    const cached = engine.docVectorCache;
+    assert.ok(cached instanceof Map, 'Should cache doc vectors as Map');
+
+    engine.scorePairs(mockNotes);
+    assert.strictEqual(engine.docVectorCache, cached, 'Should return same cached Map');
+  });
+
+  it('cosine similarity boosts notes with shared content beyond tag overlap', () => {
+    // note-x and note-y share no tags but have very similar bodies
+    const contentNotes = [
+      {
+        file: 'note-x',
+        type: 'resource',
+        title: 'Machine Learning Guide',
+        summary: 'ML concepts',
+        body: 'Neural networks backpropagation gradient descent optimizer loss function training data',
+        tags: ['ml'],
+        related: [],
+      },
+      {
+        file: 'note-y',
+        type: 'resource',
+        title: 'Deep Learning Intro',
+        summary: 'DL basics',
+        body: 'Neural networks backpropagation gradient descent optimizer loss function layers',
+        tags: ['ml'],
+        related: [],
+      },
+      {
+        file: 'note-z',
+        type: 'resource',
+        title: 'Cooking Recipes',
+        summary: 'Food',
+        body: 'Pasta tomato sauce cheese olive oil garlic basil oregano',
+        tags: ['ml'],
+        related: [],
+      },
+    ];
+
+    const vault = { scanNotes: () => contentNotes };
+    const engine = new SimilarityEngine(vault, { minScore: 0 });
+    const pairs = engine.scorePairs(contentNotes);
+
+    const xyPair = pairs.find(p => (p.a === 'note-x' && p.b === 'note-y') || (p.a === 'note-y' && p.b === 'note-x'));
+    const xzPair = pairs.find(p => (p.a === 'note-x' && p.b === 'note-z') || (p.a === 'note-z' && p.b === 'note-x'));
+
+    assert.ok(xyPair, 'Should find note-x and note-y as a pair');
+    assert.ok(xzPair, 'Should find note-x and note-z as a pair');
+    assert.ok(xyPair.score > xzPair.score, `ML notes (${xyPair.score}) should score higher than cooking notes (${xzPair.score})`);
+  });
+});
+
+describe('scoring — TF-IDF document vectors', () => {
+  it('tokenizeDoc should exclude stopwords', () => {
+    const note = { title: 'The quick brown fox', summary: '', body: 'it is a test' };
+    const tokens = tokenizeDoc(note);
+    assert.ok(!tokens.includes('the'), 'Should exclude "the"');
+    assert.ok(!tokens.includes('is'), 'Should exclude "is"');
+    assert.ok(!tokens.includes('it'), 'Should exclude "it"');
+    assert.ok(tokens.includes('quick'), 'Should include "quick"');
+    assert.ok(tokens.includes('brown'), 'Should include "brown"');
+    assert.ok(tokens.includes('test'), 'Should include "test"');
+  });
+
+  it('buildDocIDF should assign lower IDF to common terms', () => {
+    const notes = [
+      { title: 'neural networks', summary: '', body: 'deep learning neural' },
+      { title: 'neural guide', summary: '', body: 'neural networks training' },
+      { title: 'cooking', summary: '', body: 'pasta sauce garlic' },
+    ];
+    const idf = buildDocIDF(notes);
+    assert.ok(idf['neural'] < idf['garlic'], '"neural" (frequent) should have lower IDF than "garlic" (rare)');
+  });
+
+  it('buildDocVector should return sparse vector with positive weights', () => {
+    const notes = [
+      { title: 'JavaScript', summary: 'programming', body: 'functions closures' },
+      { title: 'Python', summary: 'scripting', body: 'functions loops' },
+    ];
+    const idf = buildDocIDF(notes);
+    const vec = buildDocVector(notes[0], idf);
+    assert.ok(typeof vec === 'object', 'Should return object');
+    const values = Object.values(vec);
+    assert.ok(values.length > 0, 'Vector should have entries');
+    assert.ok(values.every(v => v > 0), 'All vector values should be positive');
+  });
+
+  it('cosineSimilarity should return 1 for identical vectors', () => {
+    const vec = { a: 0.5, b: 0.3, c: 0.8 };
+    const sim = cosineSimilarity(vec, vec);
+    assert.ok(Math.abs(sim - 1.0) < 0.001, `Identical vectors should have similarity ~1, got ${sim}`);
+  });
+
+  it('cosineSimilarity should return 0 for orthogonal vectors', () => {
+    const vec1 = { a: 1, b: 0 };
+    const vec2 = { c: 1, d: 0 };
+    const sim = cosineSimilarity(vec1, vec2);
+    assert.strictEqual(sim, 0, 'Orthogonal vectors should have similarity 0');
+  });
+
+  it('cosineSimilarity should return 0 for empty vectors', () => {
+    assert.strictEqual(cosineSimilarity({}, {}), 0, 'Empty vectors should return 0');
+    assert.strictEqual(cosineSimilarity({ a: 1 }, {}), 0, 'One empty vector should return 0');
+  });
+
+  it('cosineSimilarity should return value in [0, 1] for normal vectors', () => {
+    const notes = [
+      { title: 'neural networks deep learning', summary: '', body: 'backpropagation gradient descent optimizer' },
+      { title: 'neural nets overview', summary: '', body: 'backpropagation training loss function' },
+      { title: 'cooking pasta', summary: '', body: 'tomato sauce garlic olive oil' },
+    ];
+    const idf = buildDocIDF(notes);
+    const v0 = buildDocVector(notes[0], idf);
+    const v1 = buildDocVector(notes[1], idf);
+    const v2 = buildDocVector(notes[2], idf);
+
+    const simClose = cosineSimilarity(v0, v1);
+    const simFar = cosineSimilarity(v0, v2);
+
+    assert.ok(simClose >= 0 && simClose <= 1, `Similarity should be in [0,1], got ${simClose}`);
+    assert.ok(simFar >= 0 && simFar <= 1, `Similarity should be in [0,1], got ${simFar}`);
+    assert.ok(simClose > simFar, `Similar content (${simClose}) should score higher than dissimilar (${simFar})`);
   });
 });
