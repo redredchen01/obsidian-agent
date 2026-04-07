@@ -6,6 +6,7 @@
  */
 
 import { buildTagIDF, buildDocIDF, buildDocVector, cosineSimilarity } from './scoring.mjs';
+import { EmbeddingStore } from './embedding-store.mjs';
 
 export class SimilarityEngine {
   constructor(vault, options = {}) {
@@ -21,6 +22,10 @@ export class SimilarityEngine {
     // Cache for document TF-IDF vectors
     this.docVectorCache = null;
     this.docVectorVersion = null;
+
+    // Cache for embedding store (semantic search)
+    this.embedStore = null;
+    this.embedStoreVersion = null;
   }
 
   /**
@@ -215,5 +220,28 @@ export class SimilarityEngine {
       .slice(0, maxResults);
 
     return results;
+  }
+
+  /**
+   * Semantic search using TF-IDF vector similarity (k-NN)
+   * Find notes semantically similar to the query text
+   * @param {string} queryText - User query text
+   * @param {number} k - Number of results (default 10)
+   * @returns {Array<{id, title, score}>} Top k semantically similar notes
+   */
+  semanticSearch(queryText, k = 10) {
+    const notes = this.vault.list();
+    if (!notes || notes.length === 0) {
+      return [];
+    }
+
+    // Build or retrieve cached embedding store
+    if (!this.embedStore || this.embedStoreVersion !== this.vault.version()) {
+      this.embedStore = new EmbeddingStore({ maxResults: k, minScore: 0.1 });
+      this.embedStore.build(notes);
+      this.embedStoreVersion = this.vault.version();
+    }
+
+    return this.embedStore.search(queryText, k);
   }
 }
