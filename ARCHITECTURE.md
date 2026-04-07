@@ -273,7 +273,137 @@ High-level system design and performance optimization layers introduced in v3.0.
 | Plugin ecosystem | API stability first | Defer |
 | Persistent TTL index | TTL-aware on-disk cache | v3.2.0 |
 | Batch parallelization | Low ROI (batches < 100 items) | v3.3.0+ |
-| AI capabilities | LLM integration (breaks zero-dep) | v3.2.0 |
+| Vector embedding search | Semantic similarity for memory graph | v3.7.0 |
+
+## Dynamic Memory System (v3.6.0)
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    MemoryBridge (Coordinator)                │
+│  Full sync, auto-wiring, unified context, lifecycle         │
+└───────────┬──────────────────┬──────────────────┬───────────┘
+            │                  │                  │
+   ┌────────▼────────┐  ┌─────▼──────┐  ┌───────▼────────┐
+   │  MemoryGraph    │  │ SessionMemory│  │ Claude Memory  │
+   │  (Graph DB)     │  │ (Sessions)  │  │ (~/.claude/)   │
+   └────────┬────────┘  └─────┬──────┘  └───────┬────────┘
+            │                  │                  │
+   ┌────────▼──────────────────▼──────────────────▼───────────┐
+   │                     EventBus (Events)                     │
+   │  memory:*, session:*, note:* → auto-trigger sync/bridge  │
+   └──────────────────────────────────────────────────────────┘
+```
+
+### MemoryGraph
+
+**Location:** `src/memory-graph.mjs`
+
+**Purpose:** Track weighted relationships between notes, sessions, and topics as a graph
+
+**Key Features:**
+- Node types: `project`, `area`, `resource`, `idea`, `journal`, `session`, `topic`
+- Edge types: `related`, `tag-similar`, `session-active`, `session-note:created`
+- Weighted edges with reinforcement (cap at 10) and automatic decay
+- Context-aware retrieval: graph traversal + relevance scoring
+- Persistent storage: `.clausidian/memory-graph.json`
+
+**Lifecycle:**
+- Decay: `weight *= 0.95^(days since last access)` — natural forgetting
+- Promotion: ephemeral nodes become persistent after 3+ accesses
+- Pruning: edges below 0.1 weight are removed; max 20 edges per node
+
+**Storage Format:**
+```json
+{
+  "version": "1.0",
+  "nodes": { "api-project": { "type": "project", "weight": 1.5, ... } },
+  "edges": { "api-project::backend-dev": { "weight": 2.0, "type": "related" } }
+}
+```
+
+### SessionMemory
+
+**Location:** `src/session-memory.mjs`
+
+**Purpose:** Persist session context (decisions, learnings, next steps) across agent restarts
+
+**Key Features:**
+- Session lifecycle: `startSession()` → record events → `endSession()` / `abandonSession()`
+- Auto-extraction: decisions from note creation patterns, learnings from search frequency
+- Context window: combines current session + recent sessions + graph results
+- Pending step tracking: incomplete next steps surface across sessions
+- Storage: `.clausidian/sessions/{sessionId}.json`
+
+**Session Structure:**
+```json
+{
+  "id": "20260402120000-ab12",
+  "state": "completed",
+  "context": { "topic": "api-design", "activeNotes": ["api-project"] },
+  "events": [ { "type": "note:created", "note": "new-endpoint" } ],
+  "decisions": [ { "text": "Use Fastify", "timestamp": "..." } ],
+  "learnings": [ { "text": "Always validate input", "timestamp": "..." } ],
+  "nextSteps": [ { "text": "Add auth middleware", "completed": false } ]
+}
+```
+
+### MemoryBridge
+
+**Location:** `src/memory-bridge.mjs`
+
+**Purpose:** Unified coordinator — one API for all memory operations
+
+**Key Features:**
+- Bidirectional sync: vault → graph, vault ↔ Claude memory
+- Auto-pull: detects external changes in Claude memory, auto-merges
+- Event-driven: subscribes to `note:created/updated/deleted`, `session:stop`
+- Unified query: `queryContext("topic")` → graph + sessions + vault results
+- Lifecycle maintenance: `maintenance()` runs decay + promote + cleanup
+
+### CLI Commands
+
+```bash
+# Full bidirectional sync
+clausidian memory full-sync
+
+# Graph operations
+clausidian memory graph stats
+clausidian memory graph neighbors --node api-project --depth 2
+clausidian memory graph query --query "backend"
+clausidian memory graph connections --node api-project
+clausidian memory graph hubs
+clausidian memory graph decay
+
+# Session operations
+clausidian memory session start --topic "api-design"
+clausidian memory session end --decisions "Use Fastify" --learnings "Validate input"
+clausidian memory session stats
+clausidian memory session recent --days 7
+clausidian memory session pending
+clausidian memory session learnings
+clausidian memory session context --topic "api-design"
+clausidian memory session cleanup
+
+# Lifecycle
+clausidian memory lifecycle promote
+clausidian memory lifecycle stale --days 30
+clausidian memory lifecycle maintenance
+clausidian memory lifecycle diagnostics
+
+# Unified context
+clausidian memory context "api design"
+```
+
+### Integration with EventBus
+
+| Event | Action |
+|-------|--------|
+| `note:created` | Add node to graph, record in session, push if memory:true |
+| `note:updated` | Update node metadata, re-push if memory:true |
+| `note:deleted` | Remove node from graph, remove from Claude memory |
+| `session:stop` | End session with decisions/learnings/nextSteps |
 
 ---
 
@@ -331,4 +461,4 @@ invalidateCache() {
 
 ---
 
-Last updated: 2026-03-30 (v3.1.0)
+Last updated: 2026-04-02 (v3.6.0)

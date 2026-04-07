@@ -1,9 +1,16 @@
 /**
- * memory — sync vault notes to Claude Code memory system
+ * memory — Dynamic vault-memory management
+ * Bidirectional sync, lifecycle, context-aware retrieval, graph operations
+ * v3.6.0+
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { resolve, join } from 'path';
 import { Vault } from '../vault.mjs';
+import { MemoryBridge } from '../memory-bridge.mjs';
+import { MemoryGraph } from '../memory-graph.mjs';
+import { SessionMemory } from '../session-memory.mjs';
+
+// ── Legacy API (backward compatible) ──────────────────
 
 export function memorySync(vaultRoot, options = {}) {
   const vault = new Vault(vaultRoot);
@@ -13,7 +20,6 @@ export function memorySync(vaultRoot, options = {}) {
   const notes = vault.scanNotes({ includeBody: true });
   const memoryNotes = [];
 
-  // Scan for memory:true or pin:true in frontmatter
   for (const note of notes) {
     const content = vault.read(note.dir, `${note.file}.md`);
     if (!content) continue;
@@ -25,7 +31,6 @@ export function memorySync(vaultRoot, options = {}) {
 
   const results = { synced: [], pending: [], outdated: [] };
 
-  // Write to Claude memory paths
   for (const note of memoryNotes) {
     const body = vault.extractBody(note.content);
     const memoryPath = note.type === 'project'
@@ -37,6 +42,7 @@ export function memorySync(vaultRoot, options = {}) {
       `Type: ${note.type}`,
       `Tags: ${note.tags.join(', ')}`,
       `Updated: ${note.updated}`,
+      `Source: clausidian`,
       ``,
       body,
     ].join('\n');
@@ -89,6 +95,7 @@ export function memoryPush(vaultRoot, noteName, options = {}) {
     `Type: ${note.type}`,
     `Tags: ${note.tags.join(', ')}`,
     `Updated: ${note.updated}`,
+    `Source: clausidian`,
     ``,
     body,
   ].join('\n');
@@ -145,54 +152,177 @@ export function memoryStatus(vaultRoot, options = {}) {
 
 export function contextForTopic(vaultRoot, topic, options = {}) {
   const vault = new Vault(vaultRoot);
-  const depth = options.depth || 1;
+  const bridge = new MemoryBridge(vault);
+  const result = bridge.queryContext(topic, {
+    maxResults: options.maxResults || 10,
+    depth: options.depth || 2,
+  });
+  console.log(JSON.stringify(result, null, 2));
+  return result;
+}
 
-  // Search for topic
-  const searchResults = vault.search(topic).slice(0, 5);
-  const relatedNotes = new Set();
+// ── New Dynamic API ───────────────────────────────────
 
-  for (const result of searchResults) {
-    relatedNotes.add(result.file);
+/**
+ * Full bidirectional sync with graph + lifecycle
+ */
+export function memoryFullSync(vaultRoot, options = {}) {
+  const vault = new Vault(vaultRoot);
+  const bridge = new MemoryBridge(vault);
 
-    // Add neighbors
-    const neighbors = vault.findRelated(result.file, depth);
-    for (const neighbor of neighbors) {
-      relatedNotes.add(neighbor.file);
+  const result = bridge.fullSync();
+  console.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
+/**
+ * Memory graph operations
+ */
+export function memoryGraph(vaultRoot, action, options = {}) {
+  const vault = new Vault(vaultRoot);
+  const graph = new MemoryGraph(vault);
+
+  let result;
+
+  switch (action) {
+    case 'stats':
+      result = graph.getStats();
+      break;
+
+    case 'sync':
+      result = graph.syncFromVault();
+      graph.saveToDisk();
+      break;
+
+    case 'neighbors': {
+      const nodeId = options.node;
+      if (!nodeId) throw new Error('--node required for neighbors');
+      result = graph.getNeighbors(nodeId, options.depth || 2);
+      break;
     }
 
-    // Add backlinks
-    const backlinks = vault.scanNotes()
-      .filter(n => n.related && n.related.includes(result.file));
-    for (const bl of backlinks) {
-      relatedNotes.add(bl.file);
+    case 'query': {
+      const query = options.query;
+      if (!query) throw new Error('--query required');
+      result = graph.queryContext([query], { maxResults: options.limit || 10 });
+      break;
     }
+
+    case 'connections': {
+      const nodeId = options.node;
+      if (!nodeId) throw new Error('--node required for connections');
+      result = graph.getStrongestConnections(nodeId, options.limit || 5);
+      break;
+    }
+
+    case 'hubs':
+      result = graph.getStats().hubNodes;
+      break;
+
+    case 'decay':
+      graph.applyDecay();
+      graph.saveToDisk();
+      result = { status: 'decay applied', stats: graph.getStats() };
+      break;
+
+    default:
+      throw new Error(`Unknown graph action: ${action}. Use: stats|sync|neighbors|query|connections|hubs|decay`);
   }
 
-  // Build context for each note
-  const allNotes = vault.scanNotes({ includeBody: true });
-  const contextNotes = [];
+  console.log(JSON.stringify(result, null, 2));
+  return result;
+}
 
-  for (const file of relatedNotes) {
-    const note = allNotes.find(n => n.file === file);
-    if (note) {
-      const body = vault.extractBody(note.content || vault.read(note.dir, `${note.file}.md`));
-      contextNotes.push({
-        file: note.file,
-        title: note.title,
-        type: note.type,
-        summary: note.summary,
-        body: body.slice(0, 200),
-        tags: note.tags,
+/**
+ * Session memory operations
+ */
+export function memorySession(vaultRoot, action, options = {}) {
+  const vault = new Vault(vaultRoot);
+  const graph = new MemoryGraph(vault);
+  const sessions = new SessionMemory(vault, graph);
+
+  let result;
+
+  switch (action) {
+    case 'start':
+      result = sessions.startSession({
+        topic: options.topic,
+        activeNotes: options.notes ? options.notes.split(',') : [],
       });
-    }
+      break;
+
+    case 'end':
+      result = sessions.endSession({
+        decisions: options.decisions ? options.decisions.split(';') : [],
+        learnings: options.learnings ? options.learnings.split(';') : [],
+        nextSteps: options.steps ? options.steps.split(';') : [],
+      });
+      break;
+
+    case 'stats':
+      result = sessions.getStats();
+      break;
+
+    case 'recent':
+      result = sessions.getRecentSessions(options.days || 7);
+      break;
+
+    case 'pending':
+      result = sessions.getPendingSteps(options.days || 14);
+      break;
+
+    case 'learnings':
+      result = sessions.getAggregatedLearnings(options.days || 30);
+      break;
+
+    case 'context':
+      result = sessions.buildContextWindow({ topic: options.topic });
+      break;
+
+    case 'cleanup':
+      result = sessions.cleanup();
+      break;
+
+    default:
+      throw new Error(`Unknown session action: ${action}. Use: start|end|stats|recent|pending|learnings|context|cleanup`);
   }
 
-  console.log(JSON.stringify({
-    status: 'ok',
-    topic,
-    totalNotes: contextNotes.length,
-    notes: contextNotes,
-  }));
+  console.log(JSON.stringify(result, null, 2));
+  return result;
+}
 
-  return { topic, notes: contextNotes };
+/**
+ * Memory lifecycle operations
+ */
+export function memoryLifecycle(vaultRoot, action, options = {}) {
+  const vault = new Vault(vaultRoot);
+  const bridge = new MemoryBridge(vault);
+
+  let result;
+
+  switch (action) {
+    case 'promote':
+      bridge.graph.applyDecay();
+      result = { promoted: bridge.graph.promoteMemories() };
+      bridge.graph.saveToDisk();
+      break;
+
+    case 'stale':
+      result = bridge.graph.getStaleMemories(options.days || 30);
+      break;
+
+    case 'maintenance':
+      result = bridge.maintenance();
+      break;
+
+    case 'diagnostics':
+      result = bridge.getDiagnostics();
+      break;
+
+    default:
+      throw new Error(`Unknown lifecycle action: ${action}. Use: promote|stale|maintenance|diagnostics`);
+  }
+
+  console.log(JSON.stringify(result, null, 2));
+  return result;
 }

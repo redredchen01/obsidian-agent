@@ -447,7 +447,7 @@ test('Algorithm 4.4: scoreReusability returns 1-10', () => {
 });
 
 test('Algorithm 4.5: scoreComplexity returns 1-10', () => {
-  assert.strictEqual(detector.scoreComplexity(0), 0);
+  assert.strictEqual(detector.scoreComplexity(0), 1);  // Math.max(1, ...) ensures minimum 1
   assert.strictEqual(detector.scoreComplexity(50), 10);
   assert(detector.scoreComplexity(10) > detector.scoreComplexity(5));
 });
