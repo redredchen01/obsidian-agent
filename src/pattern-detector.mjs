@@ -414,8 +414,11 @@ export class PatternDetector {
   scoreCompleteness(d) { return Math.min(10, Math.floor(d / 100)); }
   scoreMaturity(u) { return Math.min(10, Math.floor(u * 1.5)); }
   scoreReusability(u) { return Math.min(10, Math.floor(u * 2)); }
-  scoreComplexity(l) { return Math.min(10, Math.floor(l / 5)); }
-  calculateQualityScore(i, c, m, r, x) { return Math.round((i * c * m * r) / x * 10) / 10; }
+  scoreComplexity(l) { return Math.max(1, Math.floor(l / 5)); }
+  calculateQualityScore(i, c, m, r, x) { 
+    const safeX = Math.max(1, x);
+    return Math.round((i * c * m * r) / safeX * 10) / 10; 
+  }
   estimateRiskLevel(x, m, u) { return m >= 8 && x <= 5 ? 'low' : m >= 5 && x <= 7 ? 'medium' : 'high'; }
 
   scoreOpportunities(patterns, painPoints) {
