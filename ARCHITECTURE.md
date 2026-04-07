@@ -75,65 +75,15 @@ High-level system design and performance optimization layers introduced in v3.0.
 - Hit/miss counters for diagnostics
 - Lazy cleanup of expired entries
 
-**Disk Persistence (Theme C):**
-- `loadFromDisk(diskPath, vaultVersion)` - Restore cache on startup
-- `saveToDisk(diskPath, vaultVersion)` - Non-blocking write-through
-- Location: `<vault>/.clausidian/cache.json`
-- Atomic writes via temp file + rename
-
 **Invalidation:**
-- Triggered by `vault.write()` (triggers all cache clears)
-- Per-query invalidation via `SelectiveInvalidation` hook
+- Triggered by `vault.write()` (triggers full clear)
+- Per-query invalidation via `invalidate()` method
 
-### 2. ClusterCache - Union-Find Results
+**Notes:**
+- Disk persistence via separate `cache` command (see `src/commands/cache.mjs`)
+- In-memory only during process lifetime; use `cache save` to persist state
 
-**Location:** `src/cluster-cache.mjs`
-
-**Purpose:** Cache graph clustering results (union-find algorithm output)
-
-**Key Features:**
-- Vault-version aware (auto-invalidate on version mismatch)
-- Bulk load support for multiple queries
-- Expiry checking integrated with vault versioning
-
-**Invalidation:**
-- Triggers when `vault.version` changes
-- Fallback for schema migrations
-
-### 3. SelectiveInvalidation - Per-Note Dirty Tracking
-
-**Location:** `src/vault-selective-invalidation.mjs`
-
-**Purpose:** Track which notes were modified, avoiding full vault re-indexing
-
-**Key Features:**
-- Per-note dirty marking (not boolean flag)
-- Separate tracking for tags index and graph index
-- `getDirty(indexType)` returns only modified notes
-- `clearDirty(partial)` allows selective clearing
-
-**Integration:**
-- Called by `vault.write()` when notes are modified
-- Feeds invalidation signals to SelectiveInvalidation hook
-
-### 4. FileHasher - Change Detection
-
-**Location:** `src/file-hasher.mjs`
-
-**Purpose:** Detect file changes with mtime + size hashing (fast, reliable)
-
-**Key Features:**
-- Single file hashing: `O(1)` time
-- Directory traversal: recursive hashing of note tree
-- Diff detection: created, modified, deleted files
-- Size + mtime both checked (prevents false negatives)
-
-**Usage:**
-- Incremental sync foundation
-- Backup/sync tools can query change sets
-- No full vault hash needed
-
-### 5. VaultValidator - Root Directory Validation
+### 2. VaultValidator - Root Directory Validation
 
 **Location:** `src/vault-validator.mjs`
 
@@ -180,37 +130,16 @@ High-level system design and performance optimization layers introduced in v3.0.
 - `review`, `review monthly` - Report generation
 - `cache stats`, `cache clear` - Persistent cache management
 
-## Data Persistence (Theme C)
+## Planned Features (Future Work)
 
-### Disk Cache Structure
+The following performance optimization modules are designed but not yet implemented:
 
-**File:** `<vault>/.clausidian/cache.json`
+- **ClusterCache** - Union-find result caching (for graph clustering)
+- **SelectiveInvalidation** - Per-note dirty tracking (incremental re-indexing)
+- **FileHasher** - Change detection via mtime + size hashing
+- **SearchCache disk persistence** - Write-through caching to `<vault>/.clausidian/cache.json`
 
-**Format:**
-```json
-{
-  "vaultVersion": "3.1.0",
-  "timestamp": 1711827600000,
-  "entries": [
-    [
-      "keyword|type|tag|status|regex",
-      {
-        "results": [...],
-        "timestamp": 1711827500000
-      }
-    ]
-  ]
-}
-```
-
-**Lifecycle:**
-1. Process startup → `SearchCache.loadFromDisk()` restores valid entries
-2. Query → `SearchCache.set()` triggers `setImmediate()` write
-3. `vault.write()` → invalidates cache, clears disk file
-4. Process lifecycle → periodic cleanup of expired entries
-
-**Performance:**
-- Cold-start search: 500ms+ → 50ms (10x improvement)
+These are architectural designs for v3.2.0+. Current implementation focuses on in-memory SearchCache.
 - No blocking I/O during query execution (setImmediate)
 - Graceful degradation on disk errors
 
