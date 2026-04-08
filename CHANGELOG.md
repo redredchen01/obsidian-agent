@@ -1,3 +1,39 @@
+## [3.9.0] - 2026-04-08
+
+### ⚠️ Breaking Changes
+
+**Removed 35 low-priority commands** focusing Clausidian on LLM Wiki workflows and core vault management (58 → 22 commands).
+
+**Deleted commands:**
+archive, batch, bridge, broken-links, changelog, claude-md, duplicates, events, export, focus, graph, hook, import, launchd, link, memory, merge, move, neighbors, open, orphans, patch, pin, quicknote, random, recent, relink, review (variants), stale, subscribe, timeline, unpin, update, validate, watch
+
+**Migration Guide:** See `docs/MIGRATION-35-COMMANDS.md` for replacement patterns for each deleted command.
+
+### Why This Change
+
+Clausidian was designed as a personal knowledge management tool but grew to 58 commands with many serving niche use cases. 35 of these commands lacked dedicated test coverage (<10% coverage ratio), creating maintenance burden without clear value. This release refocuses on:
+
+- **Core LLM Wiki workflow:** journal → note → capture → search → memory-semantic → graph → sync
+- **Essential vault utilities:** list, update, recent, validate, tag, cache, health, stats, count, vault operations
+
+### ✅ What's Preserved
+
+- Core vault I/O and metadata handling
+- All note data and indices remain fully intact
+- Search and semantic capabilities
+- Tag and link management
+- Journal and note creation workflow
+- Health checking and validation
+
+### Migration for Users
+
+No data is lost. The vault remains fully functional. For workflows that depend on deleted commands, see `docs/MIGRATION-35-COMMANDS.md` which provides:
+- Replacement command patterns for each deleted command
+- Migration examples (e.g., `archive → update --status archived`)
+- Complexity levels and migration tips
+
+---
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
