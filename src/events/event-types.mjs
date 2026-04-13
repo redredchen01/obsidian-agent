@@ -44,6 +44,22 @@ export const SYSTEM_EVENTS = {
   'vault:sync_started': 'Cross-vault sync begin',
   'vault:sync_complete': 'Cross-vault sync done',
 
+  // ── Memory Graph (4) ──
+  'memory:node_added': 'Node added to memory graph',
+  'memory:edge_added': 'Edge added between nodes',
+  'memory:decay_applied': 'Memory decay applied',
+  'memory:promoted': 'Ephemeral memory promoted to persistent',
+
+  // ── Session Memory (3) ──
+  'session:start': 'Session started',
+  'session:stop': 'Session ended',
+  'session:abandoned': 'Session abandoned',
+
+  // ── Memory Bridge (3) ──
+  'memory:full_sync': 'Full bidirectional sync completed',
+  'memory:pushed': 'Note pushed to Claude memory',
+  'memory:pulled': 'Changes pulled from Claude memory',
+
   // ── Custom Events ──
   // User-defined: "custom:workflow-started", "custom:backup-complete", etc
 };
@@ -56,6 +72,10 @@ export const SYSTEM_EVENT_PATTERNS = [
   'fs:*',         // All file system events
   'tag:*',        // All tag events
   'link:*',       // All link events
+  'memory:*',     // All memory events
+  'session:*',    // All session events
+  'tool:*',       // All tool events
+  'journal:*',    // All journal events
   'custom:*',     // All custom events
   '*',            // All events
 ];
@@ -95,6 +115,19 @@ export const EVENT_PAYLOADS = {
 
   'vault:sync_started': { source: 'string', target: 'string', items: 'number' },
   'vault:sync_complete': { source: 'string', target: 'string', synced: 'number', conflicts: 'number' },
+
+  'memory:node_added': { id: 'string', type: 'string', label: 'string' },
+  'memory:edge_added': { source: 'string', target: 'string', type: 'string', weight: 'number' },
+  'memory:decay_applied': { nodesAffected: 'number', edgesPruned: 'number' },
+  'memory:promoted': { nodeIds: 'array' },
+
+  'session:start': { sessionId: 'string', topic: 'string' },
+  'session:stop': { sessionId: 'string', reason: 'string', duration: 'number', decisions: 'number', learnings: 'number' },
+  'session:abandoned': { sessionId: 'string' },
+
+  'memory:full_sync': { graphNodes: 'number', pushed: 'number', pulled: 'number' },
+  'memory:pushed': { note: 'string', path: 'string' },
+  'memory:pulled': { note: 'string', action: 'string' },
 };
 
 export default SYSTEM_EVENTS;

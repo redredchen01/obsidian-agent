@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.6.0] - 2026-04-02
+
+### Added — Dynamic Vault-Memory Management System
+- **MemoryGraph** (`src/memory-graph.mjs`, 320 LOC)
+  - Graph-based memory relationship tracking with weighted edges
+  - Context-aware retrieval via graph traversal + relevance scoring
+  - Automatic decay (0.95/day) and promotion (access count threshold)
+  - Vault sync: auto-creates nodes + edges from notes, related links, shared tags
+  - Persistent storage in `.clausidian/memory-graph.json`
+  - Edge pruning (max 20/node, min weight 0.1)
+
+- **SessionMemory** (`src/session-memory.mjs`, 280 LOC)
+  - Session lifecycle: start → record events → end/abandon
+  - Tracks decisions, learnings, next steps per session
+  - Context window builder (combines current + recent sessions + graph)
+  - Pending step tracking across sessions
+  - Aggregated learnings with frequency counting
+  - Auto-extraction of decisions from note creation patterns
+  - Session storage in `.clausidian/sessions/*.json`
+
+- **MemoryBridge** (`src/memory-bridge.mjs`, 250 LOC)
+  - Unified coordinator for MemoryGraph + SessionMemory + Claude memory
+  - Full bidirectional sync: vault ↔ graph, vault ↔ Claude memory
+  - Auto-pull from Claude memory (detects external changes, auto-merges)
+  - Event-driven: auto-sync on note:created/updated/deleted
+  - Unified context query (graph + sessions + vault search combined)
+  - Lifecycle maintenance: decay + promote + stale detection + cleanup
+
+- **Enhanced CLI Commands** (expanded `memory` subcommands)
+  - `memory full-sync` — full bidirectional sync with graph + lifecycle
+  - `memory graph <action>` — stats|sync|neighbors|query|connections|hubs|decay
+  - `memory session <action>` — start|end|stats|recent|pending|learnings|context|cleanup
+  - `memory lifecycle <action>` — promote|stale|maintenance|diagnostics
+  - `memory context <topic>` — unified context (graph + sessions + vault)
+  - All commands available as MCP tools (memory_graph, memory_session, memory_lifecycle, memory_context)
+
+- **New Event Types** (10 new events)
+  - `memory:node_added`, `memory:edge_added`, `memory:decay_applied`, `memory:promoted`
+  - `session:start`, `session:stop`, `session:abandoned`
+  - `memory:full_sync`, `memory:pushed`, `memory:pulled`
+
+- **Tests** (`test/memory-system.test.mjs`, 26 tests)
+  - MemoryGraph: 11 tests (nodes, edges, traversal, context, decay, promotion, stats)
+  - SessionMemory: 10 tests (lifecycle, events, persistence, cleanup, stats)
+  - MemoryBridge: 5 tests (sync, context, diagnostics, maintenance)
+
+### Changed
+- Refactored `commands/memory.mjs` to integrate MemoryBridge (backward compatible)
+- Updated `registry/integration.mjs` with new subcommands
+- Updated `events/event-types.mjs` with memory/session event patterns
+
+### Infrastructure
+- 406 tests passing (26 new), 1 pre-existing failure (unrelated)
+- Zero new dependencies (uses only Node.js stdlib)
+- All new modules follow existing ESM + zero-dep patterns
+
 ## [3.5.0] - 2026-03-31
 
 ### Added
